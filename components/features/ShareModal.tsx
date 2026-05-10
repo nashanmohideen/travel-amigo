@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { GeneratedItinerary } from "@/types";
-
-export const LS_SHARED = "ta_shared_itinerary_demo";
+import { LS_SHARED_ITINERARY_DEMO as LS_SHARED } from "@/lib/storageKeys";
 
 interface ShareModalProps {
   itinerary: GeneratedItinerary;

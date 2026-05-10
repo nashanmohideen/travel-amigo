@@ -10,8 +10,7 @@ import type {
 } from "@/types";
 import { FEEDBACK_WANTED_NEXT_OPTIONS } from "@/types";
 import { cn } from "@/lib/utils";
-
-export const LS_FEEDBACK = "ta_feedback_submissions";
+import { LS_FEEDBACK_SUBMISSIONS as LS_FEEDBACK } from "@/lib/storageKeys";
 
 interface FeedbackFormProps {
   itinerary: GeneratedItinerary;

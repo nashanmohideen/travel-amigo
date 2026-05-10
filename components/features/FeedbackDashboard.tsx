@@ -3,24 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { FeedbackSubmission, FeedbackWouldUse, FeedbackWantedNext } from "@/types";
-import { LS_FEEDBACK } from "@/components/features/FeedbackForm";
+import { LS_FEEDBACK_SUBMISSIONS as LS_FEEDBACK } from "@/lib/storageKeys";
 import { cn } from "@/lib/utils";
+import { formatDateTime } from "@/lib/formatters";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-function formatDate(iso: string) {
-  try {
-    return new Date(iso).toLocaleString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
 
 function loadSubmissions(): FeedbackSubmission[] {
   try {
@@ -150,7 +138,7 @@ function SubmissionRow({ sub }: { sub: FeedbackSubmission }) {
         className="w-full flex flex-wrap items-center gap-3 px-4 py-3 text-left hover:bg-stone-50 rounded-xl transition-colors"
       >
         <span className="text-xs text-stone-400 shrink-0 min-w-[120px]">
-          {formatDate(sub.createdAt)}
+          {formatDateTime(sub.createdAt)}
         </span>
         <span className="text-xs font-semibold text-stone-700 capitalize">
           {sub.destination ?? "—"}

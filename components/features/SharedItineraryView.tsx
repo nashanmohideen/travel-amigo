@@ -7,56 +7,16 @@ import GeneratedItineraryCard from "@/components/features/GeneratedItineraryCard
 import GeneratedBudgetSummary from "@/components/features/GeneratedBudgetSummary";
 import Card from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
+import { LS_SHARED_ITINERARY_DEMO as LS_SHARED } from "@/lib/storageKeys";
+import { formatDisplayDate } from "@/lib/formatters";
+import { isValidItinerary, getWarningSeverity } from "@/lib/itinerary/itineraryHelpers";
 
-export const LS_SHARED = "ta_shared_itinerary_demo";
-
-/* ─── helpers (duplicated from view for isolation) ───────────── */
-
-function formatDate(iso: string) {
-  try {
-    return new Date(iso).toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return iso;
-  }
-}
 
 const TRANSPORT_LABEL: Record<string, string> = {
   public: "🚌 Public transport",
   private: "🚗 Private vehicle",
   mixed: "🔀 Mixed transport",
 };
-
-const WARNING_SEVERITY: Record<
-  string,
-  { icon: string; bg: string; border: string; text: string }
-> = {
-  over_budget: { icon: "⛔", bg: "bg-red-50", border: "border-red-300", text: "text-red-700" },
-  tight_budget: { icon: "⚠️", bg: "bg-amber-50", border: "border-amber-300", text: "text-amber-700" },
-  default: { icon: "ℹ️", bg: "bg-sky-50", border: "border-sky-200", text: "text-sky-700" },
-};
-
-function warningSeverity(budgetStatus: BudgetStatus, text: string) {
-  if (budgetStatus === "over_budget" && text.toLowerCase().includes("budget"))
-    return WARNING_SEVERITY.over_budget;
-  if (budgetStatus === "tight_budget" && text.toLowerCase().includes("budget"))
-    return WARNING_SEVERITY.tight_budget;
-  return WARNING_SEVERITY.default;
-}
-
-function isValidItinerary(obj: unknown): obj is GeneratedItinerary {
-  if (!obj || typeof obj !== "object") return false;
-  const g = obj as Record<string, unknown>;
-  return (
-    typeof g.id === "string" &&
-    Array.isArray(g.days) &&
-    typeof g.budget === "object" &&
-    typeof g.tripInput === "object"
-  );
-}
 
 /* ─── Map route placeholder ──────────────────────────────────── */
 
@@ -199,7 +159,7 @@ export default function SharedItineraryView() {
             {tripInput.travelStyle.charAt(0).toUpperCase() + tripInput.travelStyle.slice(1)} style
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            {[transportLabel, paceLabel, `📅 ${formatDate(itinerary.generatedAt)}`].map((chip) => (
+            {[transportLabel, paceLabel, `📅 ${formatDisplayDate(itinerary.generatedAt)}`].map((chip) => (
               <span
                 key={chip}
                 className="text-xs bg-white/15 rounded-full px-3 py-1 backdrop-blur-sm"
@@ -216,7 +176,7 @@ export default function SharedItineraryView() {
         <div className="mx-auto max-w-6xl px-4 pt-6">
           <div className="flex flex-col gap-2">
             {warnings.map((w, i) => {
-              const sev = warningSeverity(budgetStatus, w);
+              const sev = getWarningSeverity(budgetStatus, w);
               return (
                 <div
                   key={i}

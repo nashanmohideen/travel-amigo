@@ -33,9 +33,12 @@ import {
   getBudgetStatus,
 } from "@/lib/generateItinerary";
 import { getPlacesByDestination, rankPlaces } from "@/lib/placeHelpers";
-
-export const LS_TRIP = "ta_trip_input";
-export const LS_EDITED = "ta_edited_itinerary";
+import {
+  LS_TRIP_INPUT as LS_TRIP,
+  LS_EDITED_ITINERARY as LS_EDITED,
+  LS_SHARED_ITINERARY_DEMO,
+} from "@/lib/storageKeys";
+import { isValidItinerary } from "@/lib/itinerary/itineraryHelpers";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -45,17 +48,6 @@ function saveEdited(itinerary: GeneratedItinerary): void {
   } catch {
     /* quota exceeded — silently skip */
   }
-}
-
-function isValidItinerary(obj: unknown): obj is GeneratedItinerary {
-  if (!obj || typeof obj !== "object") return false;
-  const g = obj as Record<string, unknown>;
-  return (
-    typeof g.id === "string" &&
-    Array.isArray(g.days) &&
-    typeof g.budget === "object" &&
-    typeof g.tripInput === "object"
-  );
 }
 
 // ── hook ──────────────────────────────────────────────────────────────────────
@@ -280,7 +272,7 @@ export function useEditableItinerary(): EditableItineraryState {
     try {
       localStorage.removeItem(LS_TRIP);
       localStorage.removeItem(LS_EDITED);
-      localStorage.removeItem("ta_shared_itinerary_demo");
+      localStorage.removeItem(LS_SHARED_ITINERARY_DEMO);
     } catch {}
   }, []);
 

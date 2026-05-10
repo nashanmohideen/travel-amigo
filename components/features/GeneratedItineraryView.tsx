@@ -18,22 +18,10 @@ import ShareModal from "@/components/features/ShareModal";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
+import { formatDisplayDate } from "@/lib/formatters";
+import { getWarningSeverity } from "@/lib/itinerary/itineraryHelpers";
 import FeedbackForm from "@/components/features/FeedbackForm";
 import MockAssistantPanel from "@/components/features/MockAssistantPanel";
-
-/* ─── formatDate ───────────────────────────────────────────── */
-
-function formatDate(iso: string) {
-  try {
-    return new Date(iso).toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return iso;
-  }
-}
 
 /* ─── label maps ───────────────────────────────────────────── */
 
@@ -42,40 +30,6 @@ const TRANSPORT_LABEL: Record<string, string> = {
   private: "🚗 Private vehicle",
   mixed: "🔀 Mixed transport",
 };
-
-/* ─── Warnings panel ───────────────────────────────────────── */
-
-const WARNING_SEVERITY: Record<
-  string,
-  { icon: string; bg: string; border: string; text: string }
-> = {
-  over_budget: {
-    icon: "⛔",
-    bg: "bg-red-50",
-    border: "border-red-300",
-    text: "text-red-700",
-  },
-  tight_budget: {
-    icon: "⚠️",
-    bg: "bg-amber-50",
-    border: "border-amber-300",
-    text: "text-amber-700",
-  },
-  default: {
-    icon: "ℹ️",
-    bg: "bg-sky-50",
-    border: "border-sky-200",
-    text: "text-sky-700",
-  },
-};
-
-function warningSeverity(budgetStatus: BudgetStatus, text: string) {
-  if (budgetStatus === "over_budget" && text.toLowerCase().includes("budget"))
-    return WARNING_SEVERITY.over_budget;
-  if (budgetStatus === "tight_budget" && text.toLowerCase().includes("budget"))
-    return WARNING_SEVERITY.tight_budget;
-  return WARNING_SEVERITY.default;
-}
 
 /* ─── Pace selector ────────────────────────────────────────── */
 
@@ -365,7 +319,7 @@ export default function GeneratedItineraryView() {
     balanced: "⚖️ Balanced",
     packed: "⚡ Packed",
   }[tripInput.pace] ?? tripInput.pace;
-  const generatedLabel = `📅 ${formatDate(itinerary.generatedAt)}`;
+  const generatedLabel = `📅 ${formatDisplayDate(itinerary.generatedAt)}`;
 
   /* Build callbacks once; stable references because hook fns are useCallback */
   const makeCallbacks = (dayIndex: number) => ({
@@ -452,7 +406,7 @@ export default function GeneratedItineraryView() {
         <div className="mx-auto max-w-6xl px-4 pt-6">
           <div className="flex flex-col gap-2">
             {warnings.map((w, i) => {
-              const sev = warningSeverity(budgetStatus, w);
+              const sev = getWarningSeverity(budgetStatus, w);
               return (
                 <div
                   key={i}
