@@ -1,26 +1,107 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Better default focus ring using teal brand colour */
+:focus-visible {
+  outline: 2px solid theme(--color-teal-500);
+  outline-offset: 2px;
+}
+
+/* Minimal scrollbar on webkit */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: #d1d5db;
+  border-radius: 9999px;
+}
+
+/* ── Print styles ────────────────────────────────────────────── */
+@media print {
+  /* Hide everything not meant for printing */
+  .no-print,
+  nav,
+  footer,
+  header {
+    display: none !important;
   }
-}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Reset backgrounds for ink saving */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11pt;
+  }
+
+  /* Keep page within print area */
+  .print-main {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Teal hero gradient → flat teal block */
+  .print-hero {
+    background: #0f766e !important;
+    color: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    padding: 16pt 20pt !important;
+    border-radius: 0 !important;
+  }
+
+  /* Cards: remove shadows, keep borders */
+  .print-card {
+    box-shadow: none !important;
+    border: 1pt solid #e7e5e4 !important;
+    break-inside: avoid;
+  }
+
+  /* Force backgrounds to print (Tailwind bg-* classes) */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Avoid splitting day cards across pages */
+  .print-avoid-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Budget summary should print correctly */
+  .print-budget {
+    display: block !important;
+  }
+
+  /* Two-column layout collapses to single column for print */
+  .lg\:grid-cols-\[1fr_320px\] {
+    display: block !important;
+  }
+
+  /* Sidebar items hidden in print (map placeholder, action panel) */
+  .lg\:hidden {
+    display: block !important;
+  }
+
+  /* Print disclaimer */
+  .print-disclaimer {
+    display: block !important;
+    font-size: 8pt;
+    color: #78716c;
+    margin-top: 16pt;
+    border-top: 1pt solid #e7e5e4;
+    padding-top: 8pt;
+  }
 }
