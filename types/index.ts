@@ -1,61 +1,4 @@
-export type BudgetTier = "budget" | "mid-range" | "luxury";
 export type Region = "coast" | "cultural" | "hill-country" | "wildlife";
-export type ActivityType =
-  | "sightseeing"
-  | "adventure"
-  | "culture"
-  | "food"
-  | "beach"
-  | "wildlife";
-
-export interface TripDetails {
-  startDate: string;
-  endDate: string;
-  duration: number; // days
-  travelers: number;
-  budget: BudgetTier;
-  interests: string[];
-  startingFrom: string;
-}
-
-export interface Activity {
-  id: string;
-  name: string;
-  description: string;
-  duration: string;
-  cost: number; // USD per person
-  type: ActivityType;
-}
-
-export interface ItineraryDay {
-  day: number;
-  date: string;
-  location: string;
-  title: string;
-  activities: Activity[];
-  accommodation: string;
-  meals: string[];
-  transport: string;
-  estimatedCost: number; // USD total for all travelers
-}
-
-export interface BudgetBreakdown {
-  accommodation: number;
-  food: number;
-  transport: number;
-  activities: number;
-  miscellaneous: number;
-  total: number;
-}
-
-export interface Itinerary {
-  id: string;
-  tripDetails: TripDetails;
-  days: ItineraryDay[];
-  budget: BudgetBreakdown;
-  tips: string[];
-  createdAt: string;
-}
 
 export interface Destination {
   id: string;
@@ -65,13 +8,6 @@ export interface Destination {
   highlights: string[];
   bestFor: string[];
   emoji: string;
-}
-
-export interface FeedbackFormData {
-  rating: number;
-  accuracy: number;
-  comment: string;
-  email?: string;
 }
 
 // ── Trip planning form ────────────────────────────────────────────────────────

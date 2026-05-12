@@ -7,6 +7,9 @@ import Button from "@/components/ui/Button";
 import SelectOption from "@/components/ui/SelectOption";
 import { cn, formatLKR } from "@/lib/utils";
 import type { TripInput, TravelStyle, TransportMode, TripPace } from "@/types";
+import { LS_TRIP_INPUT } from "@/lib/storageKeys";
+import { useAppDispatch } from "@/store/hooks";
+import { setTripDraft } from "@/features/trips/tripDraftSlice";
 
 // ── Static option data ────────────────────────────────────────────────────────
 
@@ -160,6 +163,7 @@ function SummaryPanel({
 // ── Main form ─────────────────────────────────────────────────────────────────
 export default function TripForm() {
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const [form, setForm] = useState<TripInput>(DEFAULT_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
@@ -216,10 +220,12 @@ export default function TripForm() {
     setLoading(true);
     // Save to localStorage so itinerary page can read user's choices
     try {
-      localStorage.setItem("ta_trip_input", JSON.stringify(form));
+      localStorage.setItem(LS_TRIP_INPUT, JSON.stringify(form));
     } catch {
       // localStorage may be unavailable (private browsing, etc.) — not fatal
     }
+    // Mirror into Redux so any component can read the current trip draft
+    dispatch(setTripDraft(form));
 
     // Simulate generation delay
     await new Promise((r) => setTimeout(r, 1600));

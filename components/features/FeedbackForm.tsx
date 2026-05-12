@@ -9,9 +9,9 @@ import type {
   GeneratedItinerary,
 } from "@/types";
 import { FEEDBACK_WANTED_NEXT_OPTIONS } from "@/types";
+import { useSubmitFeedbackMutation } from "@/features/feedback/feedbackApi";
 import { cn } from "@/lib/utils";
-
-export const LS_FEEDBACK = "ta_feedback_submissions";
+import { LS_FEEDBACK_SUBMISSIONS as LS_FEEDBACK } from "@/lib/storageKeys";
 
 interface FeedbackFormProps {
   itinerary: GeneratedItinerary;
@@ -102,6 +102,8 @@ function StarRating({
 // ── main component ────────────────────────────────────────────────────────────
 
 export default function FeedbackForm({ itinerary, wasEdited }: FeedbackFormProps) {
+  const [submitFeedback] = useSubmitFeedbackMutation();
+  
   const [wouldUse, setWouldUse] = useState<FeedbackWouldUse | null>(null);
   const [rating, setRating] = useState(0);
   const [budgetRealism, setBudgetRealism] = useState<FeedbackBudgetRealism | null>(null);
@@ -109,6 +111,8 @@ export default function FeedbackForm({ itinerary, wasEdited }: FeedbackFormProps
   const [wantedNext, setWantedNext] = useState<Set<FeedbackWantedNext>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [syncNote, setSyncNote] = useState<string | null>(null);
 
   function toggleWanted(opt: FeedbackWantedNext) {
     setWantedNext((prev) => {
@@ -119,15 +123,19 @@ export default function FeedbackForm({ itinerary, wasEdited }: FeedbackFormProps
     });
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     // Validate required fields
     if (!wouldUse || !rating || !budgetRealism) {
       setError("Please answer all required questions (marked with *).");
       return;
     }
     setError(null);
+    setSyncNote(null);
+    setIsSubmitting(true);
 
     const tripInput = itinerary.tripInput;
+    
+    // Build the submission object with server-generated fields for local storage
     const sub: FeedbackSubmission = {
       id: `fb-${Date.now()}`,
       createdAt: new Date().toISOString(),
@@ -151,7 +159,50 @@ export default function FeedbackForm({ itinerary, wasEdited }: FeedbackFormProps
       source: "itinerary_page",
     };
 
+    // Build the API input (everything except id and createdAt)
+    const apiInput = {
+      itineraryId: sub.itineraryId,
+      destination: sub.destination,
+      durationDays: sub.durationDays,
+      travellerCount: sub.travellerCount,
+      travelStyle: sub.travelStyle,
+      transportMode: sub.transportMode,
+      pace: sub.pace,
+      budgetStatus: sub.budgetStatus,
+      budgetConfidence: sub.budgetConfidence,
+      estimatedTotalLkr: sub.estimatedTotalLkr,
+      userBudgetLkr: sub.userBudgetLkr,
+      wouldUse: sub.wouldUse,
+      usefulnessRating: sub.usefulnessRating,
+      budgetRealism: sub.budgetRealism,
+      missingOrUnrealistic: sub.missingOrUnrealistic,
+      wantedNext: sub.wantedNext,
+      wasEdited: sub.wasEdited,
+      source: sub.source,
+    };
+
+    // Try API submission first
+    let apiSucceeded = false;
+    try {
+      const result = await submitFeedback(apiInput).unwrap();
+      apiSucceeded = true;
+      
+      // If API returns an id, use it for the local copy
+      if (result.id) {
+        sub.id = result.id;
+      }
+    } catch (err) {
+      // API failed — we'll still save locally
+      console.error("Feedback API submission failed:", err);
+      setSyncNote(
+        "Saved locally for prototype review. Server sync was unavailable."
+      );
+    }
+
+    // Always save a local copy (whether API succeeded or failed)
     saveSubmission(sub);
+    
+    setIsSubmitting(false);
     setSubmitted(true);
   }
 
@@ -162,6 +213,9 @@ export default function FeedbackForm({ itinerary, wasEdited }: FeedbackFormProps
         <p className="text-sm text-teal-700">
           Your feedback was saved for prototype review.
         </p>
+        {syncNote && (
+          <p className="text-xs text-teal-600 mt-2 italic">{syncNote}</p>
+        )}
       </div>
     );
   }
@@ -294,9 +348,10 @@ export default function FeedbackForm({ itinerary, wasEdited }: FeedbackFormProps
       <button
         type="button"
         onClick={handleSubmit}
-        className="self-start rounded-xl bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 active:bg-teal-900 transition-colors"
+        disabled={isSubmitting}
+        className="self-start rounded-xl bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 active:bg-teal-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Submit feedback
+        {isSubmitting ? "Submitting..." : "Submit feedback"}
       </button>
     </div>
   );

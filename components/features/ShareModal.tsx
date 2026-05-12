@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { GeneratedItinerary } from "@/types";
-
-export const LS_SHARED = "ta_shared_itinerary_demo";
+import { useCreateShareLinkMutation } from "@/features/share/shareApi";
+import { LS_SHARED_ITINERARY_DEMO as LS_SHARED } from "@/lib/storageKeys";
 
 interface ShareModalProps {
   itinerary: GeneratedItinerary;
@@ -11,29 +11,78 @@ interface ShareModalProps {
 }
 
 /**
- * Saves the itinerary to localStorage so /shared/demo can read it.
- * Returns the mock public link.
+ * Saves the itinerary to localStorage as a backup.
+ * This ensures /shared/demo always works, even if API fails.
  */
-function saveAndGetLink(itinerary: GeneratedItinerary): string {
+function saveToLocalStorage(itinerary: GeneratedItinerary): void {
   try {
     localStorage.setItem(LS_SHARED, JSON.stringify(itinerary));
   } catch {
     /* quota exceeded — silently skip */
   }
+}
+
+/**
+ * Build fallback URL using localStorage.
+ */
+function getFallbackUrl(): string {
   const origin =
     typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
   return `${origin}/shared/demo`;
 }
 
 export default function ShareModal({ itinerary, onClose }: ShareModalProps) {
+  const [createShareLink] = useCreateShareLinkMutation();
+  
   const [link, setLink] = useState("");
   const [copied, setCopied] = useState(false);
+  const [isCreating, setIsCreating] = useState(true);
+  const [syncNote, setSyncNote] = useState<string | null>(null);
 
-  // Save on mount and derive link
+  // Create share link on mount (once per modal open)
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLink(saveAndGetLink(itinerary));
-  }, [itinerary]);
+    let isMounted = true;
+
+    const createLink = async () => {
+      setIsCreating(true);
+      setSyncNote(null);
+
+      // Always save to localStorage first
+      saveToLocalStorage(itinerary);
+
+      // Try API share link creation
+      try {
+        const result = await createShareLink({ itinerary }).unwrap();
+        
+        if (isMounted) {
+          // Use API URL
+          setLink(result.url);
+          setSyncNote(null);
+        }
+      } catch (err) {
+        // API failed — use fallback
+        console.error("Failed to create share link via API:", err);
+        
+        if (isMounted) {
+          const fallbackUrl = getFallbackUrl();
+          setLink(fallbackUrl);
+          setSyncNote(
+            "Using browser-local prototype sharing because server sharing is unavailable."
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsCreating(false);
+        }
+      }
+    };
+
+    createLink();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [itinerary, createShareLink]);
 
   async function handleCopy() {
     if (!link) return;
@@ -84,10 +133,12 @@ export default function ShareModal({ itinerary, onClose }: ShareModalProps) {
 
         {/* Body */}
         <div className="px-5 py-5 flex flex-col gap-4">
-          {/* Prototype notice */}
+          {/* Info notice */}
           <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800">
-            <strong>Prototype mode.</strong> This link works in the same browser on this device.
-            A live URL will be available when the backend launches.
+            <strong>Prototype mode.</strong> Creating shareable links for real-time collaboration.
+            {syncNote && (
+              <div className="mt-1.5 text-amber-700 italic">{syncNote}</div>
+            )}
           </div>
 
           {/* Link display + copy */}
@@ -95,11 +146,12 @@ export default function ShareModal({ itinerary, onClose }: ShareModalProps) {
             <p className="text-xs font-semibold text-stone-500 mb-1.5">Shareable link</p>
             <div className="flex items-center gap-2">
               <div className="flex-1 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-xs text-stone-600 font-mono truncate select-all">
-                {link || "Generating link…"}
+                {link || (isCreating ? "Creating link…" : "Error loading link")}
               </div>
               <button
                 onClick={handleCopy}
-                className="shrink-0 rounded-xl bg-teal-700 text-white text-xs font-semibold px-4 py-2.5 hover:bg-teal-800 active:bg-teal-900 transition-colors"
+                disabled={!link || isCreating}
+                className="shrink-0 rounded-xl bg-teal-700 text-white text-xs font-semibold px-4 py-2.5 hover:bg-teal-800 active:bg-teal-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {copied ? "✓ Copied!" : "Copy link"}
               </button>
@@ -111,7 +163,8 @@ export default function ShareModal({ itinerary, onClose }: ShareModalProps) {
             <p className="text-xs font-semibold text-stone-500 mb-1.5">Share via</p>
             <button
               onClick={handleWhatsApp}
-              className="w-full flex items-center justify-center gap-2 rounded-xl border border-green-200 bg-green-50 text-green-700 font-semibold text-sm py-3 hover:bg-green-100 hover:border-green-300 active:bg-green-200 transition-colors"
+              disabled={!link || isCreating}
+              className="w-full flex items-center justify-center gap-2 rounded-xl border border-green-200 bg-green-50 text-green-700 font-semibold text-sm py-3 hover:bg-green-100 hover:border-green-300 active:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {/* WhatsApp SVG icon */}
               <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current" aria-hidden="true">
