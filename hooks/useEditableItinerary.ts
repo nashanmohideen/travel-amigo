@@ -32,6 +32,7 @@ import {
   setRegeneratedItinerary,
 } from "@/features/itinerary/itinerarySlice";
 import { resetTripDraft } from "@/features/trips/tripDraftSlice";
+import { useGenerateItineraryMutation } from "@/features/itinerary/itineraryApi";
 import type {
   GeneratedItinerary,
   TripInput,
@@ -92,6 +93,7 @@ export interface EditableItineraryState {
 
 export function useEditableItinerary(): EditableItineraryState {
   const dispatch = useAppDispatch();
+  const [generateMutation] = useGenerateItineraryMutation();
 
   // ── Redux selectors ──────────────────────────────────────────────────────
   const activeItinerary = useAppSelector((s) => s.itinerary.activeItinerary);
@@ -106,60 +108,101 @@ export function useEditableItinerary(): EditableItineraryState {
   // Guard: skip the persistence effect until after hydration is complete.
   const hydratedRef = useRef(false);
 
+  // ── Helper: Try API generation with fallback to local generator ──────────
+  /**
+   * Attempts to generate an itinerary using the RTK Query mutation.
+   * If the API fails (network, timeout, 400/500), falls back to local generation.
+   * 
+   * Returns a promise that resolves to a GeneratedItinerary and  
+   * whether it came from the API or local fallback.
+   */
+  const generateWithApiFallback = useCallback(
+    async (input: TripInput): Promise<{
+      itinerary: GeneratedItinerary;
+      source: "api" | "local_fallback";
+    }> => {
+      try {
+        // Try the server API first
+        const apiItinerary = await generateMutation(input).unwrap();
+        return { itinerary: apiItinerary, source: "api" };
+      } catch (error) {
+        // API failed — fall back to local generation
+        // Silently use the local generator; we don't crash the page
+        const localItinerary = generateItinerary(input);
+        return { itinerary: localItinerary, source: "local_fallback" };
+      }
+    },
+    [generateMutation]
+  );
+
   // ── Hydration from localStorage (runs once on mount) ────────────────────
   useEffect(() => {
-    // 1. Try to load trip input from localStorage
-    let input: TripInput | null = null;
-    let gotStorage = false;
-    try {
-      const raw = localStorage.getItem(LS_TRIP);
-      if (raw) {
-        input = JSON.parse(raw) as TripInput;
-        gotStorage = true;
-      }
-    } catch {
-      /* invalid JSON — treat as missing */
-    }
+    let isMounted = true;
 
-    // 2. Try to restore a previously edited itinerary
-    let edited: GeneratedItinerary | null = null;
-    try {
-      const raw = localStorage.getItem(LS_EDITED);
-      if (raw) {
-        const parsed: unknown = JSON.parse(raw);
-        if (isValidItinerary(parsed)) edited = parsed;
+    const performHydration = async () => {
+      // 1. Try to load trip input from localStorage
+      let input: TripInput | null = null;
+      let gotStorage = false;
+      try {
+        const raw = localStorage.getItem(LS_TRIP);
+        if (raw) {
+          input = JSON.parse(raw) as TripInput;
+          gotStorage = true;
+        }
+      } catch {
+        /* invalid JSON — treat as missing */
       }
-    } catch {
-      /* malformed — ignore */
-    }
 
-    // 3. Decide what to load into Redux
-    /* eslint-disable react-hooks/set-state-in-effect */
-    if (edited) {
-      // Sanity-check: edited itinerary must match current trip destination
-      const destMatch =
-        !input || edited.tripInput?.destination === input.destination;
-      if (destMatch) {
-        dispatch(setActiveItinerary({ itinerary: edited, source: "edited" }));
+      // 2. Try to restore a previously edited itinerary
+      let edited: GeneratedItinerary | null = null;
+      try {
+        const raw = localStorage.getItem(LS_EDITED);
+        if (raw) {
+          const parsed: unknown = JSON.parse(raw);
+          if (isValidItinerary(parsed)) edited = parsed;
+        }
+      } catch {
+        /* malformed — ignore */
+      }
+
+      // 3. Decide what to load into Redux
+      if (edited) {
+        // Sanity-check: edited itinerary must match current trip destination
+        const destMatch =
+          !input || edited.tripInput?.destination === input.destination;
+        if (destMatch) {
+          if (isMounted) {
+            dispatch(setActiveItinerary({ itinerary: edited, source: "edited" }));
+            setFromStorage(gotStorage);
+            hydratedRef.current = true;
+          }
+          return;
+        }
+        // Stale edited itinerary (different destination) — discard it
+        try {
+          localStorage.removeItem(LS_EDITED);
+        } catch {}
+      }
+
+      // Fresh generation — use API first with local fallback
+      if (!input) input = createDefaultTripInput();
+      const { itinerary: fresh, source } = await generateWithApiFallback(input);
+      
+      if (isMounted) {
+        // Determine the source label: prioritize "generated" (API + gotStorage) or "fallback"
+        const src = gotStorage ? "generated" : "fallback";
+        dispatch(setActiveItinerary({ itinerary: fresh, source: src }));
         setFromStorage(gotStorage);
         hydratedRef.current = true;
-        return;
       }
-      // Stale edited itinerary (different destination) — discard it
-      try {
-        localStorage.removeItem(LS_EDITED);
-      } catch {}
-    }
+    };
 
-    // Fresh generation
-    if (!input) input = createDefaultTripInput();
-    const fresh = generateItinerary(input);
-    const src = gotStorage ? "generated" : "fallback";
-    dispatch(setActiveItinerary({ itinerary: fresh, source: src }));
-    setFromStorage(gotStorage);
-    hydratedRef.current = true;
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [dispatch]);
+    performHydration();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [dispatch, generateWithApiFallback]);
 
   // ── Persist edited itinerary to localStorage after every edit ────────────
   useEffect(() => {
@@ -204,41 +247,57 @@ export function useEditableItinerary(): EditableItineraryState {
   );
 
   const changePace = useCallback(
-    (pace: TripPace) => {
+    async (pace: TripPace) => {
       const input = tripInput ?? createDefaultTripInput();
       const newInput: TripInput = { ...input, pace };
-      const fresh = generateItinerary(newInput);
-      // Write updated trip input to localStorage so it survives a page refresh
+      
+      // Try API generation with local fallback
       try {
-        localStorage.setItem(LS_TRIP, JSON.stringify(newInput));
-      } catch {}
-      const label =
-        { relaxed: "Relaxed", balanced: "Balanced", packed: "Packed" }[pace] ?? pace;
-      dispatch(
-        setRegeneratedItinerary({
-          itinerary: fresh,
-          lastAction: `Pace changed to ${label} — itinerary regenerated.`,
-          markEdited: true,
-        })
-      );
+        const { itinerary: fresh } = await generateWithApiFallback(newInput);
+        
+        // Write updated trip input to localStorage so it survives a page refresh
+        try {
+          localStorage.setItem(LS_TRIP, JSON.stringify(newInput));
+        } catch {}
+        
+        const label =
+          { relaxed: "Relaxed", balanced: "Balanced", packed: "Packed" }[pace] ?? pace;
+        dispatch(
+          setRegeneratedItinerary({
+            itinerary: fresh,
+            lastAction: `Pace changed to ${label} — itinerary regenerated.`,
+            markEdited: true,
+          })
+        );
+      } catch {
+        // Should not happen with local fallback, but handle gracefully
+        console.error("Failed to regenerate itinerary after pace change");
+      }
     },
-    [dispatch, tripInput]
+    [dispatch, tripInput, generateWithApiFallback]
   );
 
-  const resetToGenerated = useCallback(() => {
+  const resetToGenerated = useCallback(async () => {
     try {
       localStorage.removeItem(LS_EDITED);
     } catch {}
     const input = tripInput ?? createDefaultTripInput();
-    const fresh = generateItinerary(input);
-    dispatch(
-      setRegeneratedItinerary({
-        itinerary: fresh,
-        lastAction: "Reset to original generated plan.",
-        markEdited: false,
-      })
-    );
-  }, [dispatch, tripInput]);
+    
+    // Try API generation with local fallback
+    try {
+      const { itinerary: fresh } = await generateWithApiFallback(input);
+      dispatch(
+        setRegeneratedItinerary({
+          itinerary: fresh,
+          lastAction: "Reset to original generated plan.",
+          markEdited: false,
+        })
+      );
+    } catch {
+      // Should not happen with local fallback, but handle gracefully
+      console.error("Failed to regenerate itinerary after reset");
+    }
+  }, [dispatch, tripInput, generateWithApiFallback]);
 
   const startOver = useCallback(() => {
     // Clear the three keys that belong to this session — never touch LS_FEEDBACK_SUBMISSIONS

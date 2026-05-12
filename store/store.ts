@@ -1,28 +1,36 @@
 /**
  * Redux store for Travel Amigo.
  *
- * Slice registry — add new slices here as they are created:
+ * Slice registry:
  *   tripDraft   — active trip planning form data (/plan)
  *   ui          — app-level UI flags (modals, toasts, global loading)
- *   itinerary   — active generated/edited itinerary (Phase 3: skeleton only)
+ *   itinerary   — active generated/edited itinerary
+ *   baseApi     — RTK Query API endpoints (Phase 7+)
+ *
+ * Middleware:
+ *   baseApi.middleware — RTK Query listener middleware for cache invalidation
  *
  * Note on redux-persist:
- *   Intentionally excluded in Phase 3.  Next.js App Router SSR makes naive
- *   persistence setups produce hydration mismatches.  Persistence will be
- *   added in a controlled phase after server-side data fetching is in place.
+ *   Intentionally excluded.  Next.js App Router SSR makes naive persistence
+ *   setups produce hydration mismatches.  Persistence is controlled by
+ *   useEditableItinerary hook lifecycle.
  */
 
 import { configureStore } from "@reduxjs/toolkit";
 import tripDraftReducer from "@/features/trips/tripDraftSlice";
 import uiReducer from "@/features/ui/uiSlice";
 import itineraryReducer from "@/features/itinerary/itinerarySlice";
+import { baseApi } from "@/features/api/baseApi";
 
 export const store = configureStore({
   reducer: {
     tripDraft: tripDraftReducer,
     ui: uiReducer,
     itinerary: itineraryReducer,
+    [baseApi.reducerPath]: baseApi.reducer,
   },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().concat(baseApi.middleware),
 });
 
 // ── Types ─────────────────────────────────────────────────────────────────────

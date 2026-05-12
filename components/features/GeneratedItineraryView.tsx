@@ -11,6 +11,7 @@ import type {
   BudgetStatus,
 } from "@/types";
 import { useEditableItinerary } from "@/hooks/useEditableItinerary";
+import { useSaveItineraryMutation } from "@/features/itinerary/itineraryApi";
 import GeneratedItineraryCard from "@/components/features/GeneratedItineraryCard";
 import GeneratedBudgetSummary from "@/components/features/GeneratedBudgetSummary";
 import ReplacePlaceModal from "@/components/features/ReplacePlaceModal";
@@ -123,6 +124,8 @@ interface ActionPanelProps {
   onStartOver: () => void;
   onShare: () => void;
   onPrint: () => void;
+  onSave: () => void;
+  isSaving: boolean;
   pace: TripPace;
   onPaceChange: (p: TripPace) => void;
 }
@@ -133,6 +136,8 @@ function ActionPanel({
   onStartOver,
   onShare,
   onPrint,
+  onSave,
+  isSaving,
   pace,
   onPaceChange,
 }: ActionPanelProps) {
@@ -148,6 +153,15 @@ function ActionPanel({
             ✏️ Edit preferences
           </Button>
         </Link>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start"
+          disabled={isSaving}
+          onClick={onSave}
+        >
+          💾 {isSaving ? "Saving..." : "Save trip"}
+        </Button>
         <Button
           variant="ghost"
           size="sm"
@@ -262,6 +276,26 @@ export default function GeneratedItineraryView() {
 
   /* ── Share modal ── */
   const [shareOpen, setShareOpen] = useState(false);
+
+  /* ── Save itinerary mutation ── */
+  const [saveItinerary, { isLoading: isSaving }] = useSaveItineraryMutation();
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  async function handleSave() {
+    if (!itinerary) return;
+
+    try {
+      const result = await saveItinerary(itinerary).unwrap();
+      setSavedId(result.id);
+      setSaveMessage(`Trip saved for this prototype session. ID: ${result.id.substring(0, 8)}`);
+      setNotification(saveMessage || `Saved successfully`);
+    } catch (err) {
+      // API failed - show fallback message but don't crash
+      setSaveMessage("Saved locally in this browser. Server save was unavailable.");
+      setNotification(saveMessage);
+    }
+  }
 
   /* ── Replace modal ── */
   const [replaceState, setReplaceState] = useState<ReplaceState>({
@@ -493,6 +527,8 @@ export default function GeneratedItineraryView() {
               onStartOver={handleStartOver}
               onShare={() => setShareOpen(true)}
               onPrint={handlePrint}
+              onSave={handleSave}
+              isSaving={isSaving}
               pace={tripInput.pace}
               onPaceChange={changePace}
             />
