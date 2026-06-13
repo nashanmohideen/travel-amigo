@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type {
   GeneratedItinerary,
   ItineraryItem,
@@ -12,6 +12,8 @@ import type {
 } from "@/types";
 import { useEditableItinerary } from "@/hooks/useEditableItinerary";
 import { useSaveItineraryMutation } from "@/features/itinerary/itineraryApi";
+import { useAppSelector } from "@/store/hooks";
+import { LS_EDITED_ITINERARY } from "@/lib/storageKeys";
 import GeneratedItineraryCard from "@/components/features/GeneratedItineraryCard";
 import GeneratedBudgetSummary from "@/components/features/GeneratedBudgetSummary";
 import ReplacePlaceModal from "@/components/features/ReplacePlaceModal";
@@ -207,6 +209,37 @@ function ActionPanel({
   );
 }
 
+/* ─── Guest save prompt ───────────────────────────────────── */
+
+function GuestSavePrompt({
+  redirectPath,
+  onDismiss,
+}: {
+  redirectPath: string;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 max-w-sm w-[calc(100%-2rem)] rounded-2xl bg-stone-900 px-4 py-3 shadow-xl text-white text-sm font-medium animate-in fade-in slide-in-from-bottom-2">
+      <span className="flex-1">
+        Sign in to save your trip to your account.{" "}
+        <Link
+          href={`/login?redirect=${encodeURIComponent(redirectPath)}`}
+          className="underline font-semibold text-teal-300 hover:text-teal-200"
+        >
+          Sign in
+        </Link>
+      </span>
+      <button
+        onClick={onDismiss}
+        className="shrink-0 text-stone-400 hover:text-white transition-colors text-xs"
+        aria-label="Dismiss"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
 /* ─── Toast notification ──────────────────────────────────── */
 
 function Toast({
@@ -277,23 +310,33 @@ export default function GeneratedItineraryView() {
   /* ── Share modal ── */
   const [shareOpen, setShareOpen] = useState(false);
 
-  /* ── Save itinerary mutation ── */
+  /* ── Save itinerary (POST /api/v1/trips, auth required) ── */
+  const pathname = usePathname();
+  const authStatus = useAppSelector((s) => s.auth.status);
   const [saveItinerary, { isLoading: isSaving }] = useSaveItineraryMutation();
-  const [savedId, setSavedId] = useState<string | null>(null);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [showGuestPrompt, setShowGuestPrompt] = useState(false);
 
   async function handleSave() {
     if (!itinerary) return;
 
+    // Guests keep the existing localStorage persistence (useEditableItinerary
+    // already writes ta_edited_itinerary) and are prompted to sign in instead.
+    if (authStatus !== "authenticated") {
+      setShowGuestPrompt(true);
+      return;
+    }
+
     try {
       const result = await saveItinerary(itinerary).unwrap();
-      setSavedId(result.id);
-      setSaveMessage(`Trip saved for this prototype session. ID: ${result.id.substring(0, 8)}`);
-      setNotification(saveMessage || `Saved successfully`);
-    } catch (err) {
-      // API failed - show fallback message but don't crash
-      setSaveMessage("Saved locally in this browser. Server save was unavailable.");
-      setNotification(saveMessage);
+      // The trip now lives server-side — drop the localStorage copy and move
+      // to the bookmarkable detail page.
+      try {
+        localStorage.removeItem(LS_EDITED_ITINERARY);
+      } catch {}
+      setNotification("Trip saved to your account.");
+      router.push(`/trips/${result.id}`);
+    } catch {
+      setNotification("Could not save your trip — please try again.");
     }
   }
 
@@ -551,6 +594,14 @@ export default function GeneratedItineraryView() {
           alternatives={replaceState.alternatives}
           onSelect={handleReplaceSelect}
           onClose={() => setReplaceState((s) => ({ ...s, open: false }))}
+        />
+      )}
+
+      {/* ── Guest save prompt ── */}
+      {showGuestPrompt && (
+        <GuestSavePrompt
+          redirectPath={pathname}
+          onDismiss={() => setShowGuestPrompt(false)}
         />
       )}
 

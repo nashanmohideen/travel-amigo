@@ -1,34 +1,31 @@
 /**
- * RTK Query endpoints for itinerary operations.
- *
- * Phase 8 contract standardization: endpoints are defined with standard response types.
- * All generation still happens client-side via useEditableItinerary.
- *
- * When backend is ready:
- *   1. Implement the actual backend endpoints
- *   2. Ensure responses match the defined types
- *   3. Wire useGenerateItineraryMutation into TripForm or flow
+ * RTK Query endpoints for itinerary operations, wired to the NestJS backend
+ * (TripsModule, /api/v1/trips).
  */
 
 import { baseApi } from "@/features/api/baseApi";
 import type { GeneratedItinerary, TripInput } from "@/types";
 import type { SaveItineraryResponse } from "@/features/api/apiTypes";
 
+/** Backend Trip row shape (subset the frontend consumes). */
+export interface TripRecord {
+  id: string;
+  title: string;
+  itinerarySnapshot: GeneratedItinerary;
+}
+
 export const itineraryApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     /**
      * Generate a new itinerary from trip input.
      *
-     * Future implementation:
-     *   POST /api/itinerary/generate
-     *   body: TripInput
-     *   response: GeneratedItinerary
-     *
-     * Currently not used (client-side generation via lib/generateItinerary.ts).
+     * POST /api/v1/trips/generate
+     * body: TripInput → response: GeneratedItinerary
+     * Guests allowed; rate-limited server-side (10/hour per IP).
      */
     generateItinerary: builder.mutation<GeneratedItinerary, TripInput>({
       query: (tripInput) => ({
-        url: "/itinerary/generate",
+        url: "/trips/generate",
         method: "POST",
         body: tripInput,
       }),
@@ -36,35 +33,47 @@ export const itineraryApi = baseApi.injectEndpoints({
     }),
 
     /**
-     * Save/persist an edited itinerary to the backend.
+     * Save/persist an edited itinerary as a Trip (requires auth).
      *
-     * Future implementation:
-     *   POST /api/itineraries
-     *   body: GeneratedItinerary
-     *   response: SaveItineraryResponse { ok: boolean; id: string; message?: string }
-     *
-     * Currently not used (localStorage via useEditableItinerary).
+     * POST /api/v1/trips
+     * body: { title, budget, itinerarySnapshot } → response: Trip record
      */
     saveItinerary: builder.mutation<SaveItineraryResponse, GeneratedItinerary>({
       query: (itinerary) => ({
-        url: "/itineraries",
+        url: "/trips",
         method: "POST",
-        body: itinerary,
+        body: {
+          title: itinerary.title,
+          budget: itinerary.tripInput.budgetLKR,
+          itinerarySnapshot: itinerary,
+        },
       }),
-      invalidatesTags: ["Itinerary"],
+      transformResponse: (trip: TripRecord): SaveItineraryResponse => ({
+        ok: true,
+        id: trip.id,
+      }),
+      invalidatesTags: ["Itinerary", "Trip"],
     }),
 
     /**
-     * Fetch an itinerary by ID from the backend.
+     * List the user's saved trips (requires auth).
      *
-     * Future implementation:
-     *   GET /api/itineraries/:id
-     *   response: GeneratedItinerary
+     * GET /api/v1/trips → Trip records.
+     */
+    listTrips: builder.query<TripRecord[], void>({
+      query: () => "/trips",
+      providesTags: ["Trip"],
+    }),
+
+    /**
+     * Fetch a saved trip's itinerary by trip ID (requires auth).
      *
-     * Currently not used.
+     * GET /api/v1/trips/:id → Trip record; the snapshot is the exact
+     * GeneratedItinerary as last rendered.
      */
     getItinerary: builder.query<GeneratedItinerary, string>({
-      query: (id) => `/itineraries/${id}`,
+      query: (id) => `/trips/${id}`,
+      transformResponse: (trip: TripRecord): GeneratedItinerary => trip.itinerarySnapshot,
       providesTags: (result) => (result ? ["Itinerary"] : []),
     }),
   }),
@@ -73,5 +82,6 @@ export const itineraryApi = baseApi.injectEndpoints({
 export const {
   useGenerateItineraryMutation,
   useSaveItineraryMutation,
+  useListTripsQuery,
   useGetItineraryQuery,
 } = itineraryApi;

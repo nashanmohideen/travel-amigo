@@ -4,60 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { FeedbackSubmission, FeedbackWouldUse, FeedbackWantedNext } from "@/types";
 import { useGetFeedbackSubmissionsQuery } from "@/features/feedback/feedbackApi";
-import { LS_FEEDBACK_SUBMISSIONS as LS_FEEDBACK } from "@/lib/storageKeys";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/formatters";
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-function loadSubmissions(): FeedbackSubmission[] {
-  try {
-    const raw = localStorage.getItem(LS_FEEDBACK);
-    if (raw) return JSON.parse(raw) as FeedbackSubmission[];
-  } catch {
-    /* ignore */
-  }
-  return [];
-}
-
-/**
- * Merge API feedback with local feedback.
- * 
- * Strategy:
- *   - If API returns items, use them (API is authoritative for what was submitted)
- *   - If local has items not in API, include them (local-only entries)
- *   - Deduplicate by id (API id wins if both exist)
- *   - Sort by createdAt descending (newest first)
- */
-function mergeFeedbackSubmissions(
-  apiItems: FeedbackSubmission[],
-  localItems: FeedbackSubmission[]
-): FeedbackSubmission[] {
-  const seen = new Set<string>();
-  const merged: FeedbackSubmission[] = [];
-
-  // Add API items first
-  for (const item of apiItems) {
-    merged.push(item);
-    seen.add(item.id);
-  }
-
-  // Add local-only items
-  for (const item of localItems) {
-    if (!seen.has(item.id)) {
-      merged.push(item);
-    }
-  }
-
-  // Sort newest first
-  merged.sort((a, b) => {
-    const aTime = new Date(a.createdAt).getTime();
-    const bTime = new Date(b.createdAt).getTime();
-    return bTime - aTime;
-  });
-
-  return merged;
-}
 
 function topWantedNext(subs: FeedbackSubmission[]): FeedbackWantedNext | null {
   const counts = new Map<FeedbackWantedNext, number>();
@@ -279,40 +227,18 @@ function SubmissionRow({ sub }: { sub: FeedbackSubmission }) {
 // ── main component ────────────────────────────────────────────────────────────
 
 export default function FeedbackDashboard() {
-  // RTK Query hook — fetch from API
+  // Feedback is server-side only (GET /api/v1/feedback, admin-gated) —
+  // the localStorage fallback has been removed.
   const { data: apiItems = [], isLoading, error } = useGetFeedbackSubmissionsQuery();
 
   const [subs, setSubs] = useState<FeedbackSubmission[] | null>(null);
   const [copied, setCopied] = useState(false);
-  const [syncSource, setSyncSource] = useState<"api" | "local" | "merged">("api");
 
   useEffect(() => {
-    // Load local feedback as fallback
-    const localItems = loadSubmissions();
-
-    // Decide what to display
     if (isLoading) {
-      // Still loading — show nothing yet
       setSubs(null);
-    } else if (error) {
-      // API failed — use localStorage as fallback
-      setSubs(localItems);
-      setSyncSource("local");
-    } else if (apiItems.length > 0 || localItems.length === 0) {
-      // API returned data, or both are empty
-      if (apiItems.length > 0 && localItems.length > 0) {
-        // Merge API + local
-        setSubs(mergeFeedbackSubmissions(apiItems, localItems));
-        setSyncSource("merged");
-      } else {
-        // Just API data (or both empty)
-        setSubs(apiItems);
-        setSyncSource("api");
-      }
     } else {
-      // API returned empty but local has data
-      setSubs(localItems);
-      setSyncSource("local");
+      setSubs(apiItems);
     }
   }, [apiItems, isLoading, error]);
 
@@ -341,13 +267,10 @@ export default function FeedbackDashboard() {
       : "—";
   const top = topWantedNext(subs);
 
-  // Determine source message
-  const sourceMessage =
-    syncSource === "api"
-      ? "Showing server feedback entries."
-      : syncSource === "local"
-        ? "Showing local prototype feedback because the server is unavailable."
-        : "Showing server feedback and local backup entries.";
+  // GET /api/v1/feedback requires an admin session on the backend
+  const sourceMessage = error
+    ? "Could not load feedback from the server — this view requires an admin session."
+    : "Showing server feedback entries.";
 
   return (
     <div className="min-h-screen bg-stone-50">

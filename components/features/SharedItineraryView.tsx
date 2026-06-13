@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { GeneratedItinerary, BudgetStatus } from "@/types";
+import type { GeneratedItinerary } from "@/types";
 import GeneratedItineraryCard from "@/components/features/GeneratedItineraryCard";
 import GeneratedBudgetSummary from "@/components/features/GeneratedBudgetSummary";
 import Card from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
-import { LS_SHARED_ITINERARY_DEMO as LS_SHARED } from "@/lib/storageKeys";
 import { formatDisplayDate } from "@/lib/formatters";
 import { isValidItinerary, getWarningSeverity } from "@/lib/itinerary/itineraryHelpers";
 import { useGetSharedItineraryQuery } from "@/features/share/shareApi";
@@ -89,71 +88,25 @@ function EmptyState() {
 
 export default function SharedItineraryView({ token = "demo" }: Props) {
   const [itinerary, setItinerary] = useState<GeneratedItinerary | null | "loading">("loading");
-  const [source, setSource] = useState<"api" | "localStorage" | "demo">("localStorage");
 
-  // Determine if we should fetch from API
-  const shouldFetchApi = token && token !== "demo";
-  
-  // RTK Query hook: only fetches if shouldFetchApi is true
-  const { data: apiItinerary, isLoading: apiIsLoading, error: apiError } = useGetSharedItineraryQuery(
-    token || "demo",
-    { skip: !shouldFetchApi }
-  );
+  // Shared itineraries are loaded from the backend only
+  // (GET /api/v1/share/:token) — the localStorage fallback has been removed.
+  const { data: apiItinerary, isLoading: apiIsLoading, error: apiError } =
+    useGetSharedItineraryQuery(token);
 
-  // Phase 16: Implement try-API-first with localStorage fallback
   useEffect(() => {
-    // Case A: token === "demo" or no token
-    if (!shouldFetchApi) {
-      try {
-        const raw = localStorage.getItem(LS_SHARED);
-        if (raw) {
-          const parsed: unknown = JSON.parse(raw);
-          if (isValidItinerary(parsed)) {
-            setItinerary(parsed);
-            setSource("demo");
-            return;
-          }
-        }
-      } catch {
-        /* malformed JSON */
-      }
-      setItinerary(null);
-      return;
-    }
-
-    // Case B & C: Real API token
     if (apiIsLoading) {
       setItinerary("loading");
       return;
     }
-
-    // Case B: API succeeded
     if (apiItinerary && isValidItinerary(apiItinerary)) {
       setItinerary(apiItinerary);
-      setSource("api");
       return;
     }
-
-    // Case C: API failed or returned invalid data — fallback to localStorage
     if (apiError || !apiItinerary) {
-      try {
-        const raw = localStorage.getItem(LS_SHARED);
-        if (raw) {
-          const parsed: unknown = JSON.parse(raw);
-          if (isValidItinerary(parsed)) {
-            setItinerary(parsed);
-            setSource("localStorage");
-            return;
-          }
-        }
-      } catch {
-        /* malformed JSON */
-      }
-      // Both API and localStorage failed
       setItinerary(null);
-      setSource("api");
     }
-  }, [token, shouldFetchApi, apiItinerary, apiIsLoading, apiError]);
+  }, [token, apiItinerary, apiIsLoading, apiError]);
 
   if (itinerary === "loading") {
     return (
@@ -176,14 +129,6 @@ export default function SharedItineraryView({ token = "demo" }: Props) {
     packed: "⚡ Packed",
   }[tripInput.pace] ?? tripInput.pace;
 
-  // Determine banner subtitle based on source
-  const bannerSubtitle =
-    source === "demo"
-      ? "This browser-local prototype share is available only in the same browser it was shared from."
-      : source === "localStorage"
-      ? "Showing browser-local fallback because this shared link is unavailable."
-      : null;
-
   return (
     <div className="min-h-screen bg-stone-50">
       {/* ── Shared banner ── */}
@@ -195,11 +140,6 @@ export default function SharedItineraryView({ token = "demo" }: Props) {
             Create your own trip →
           </Link>
         </p>
-        {bannerSubtitle && (
-          <p className="text-xs text-teal-600 mt-0.5">
-            {bannerSubtitle}
-          </p>
-        )}
       </div>
 
       {/* ── Hero header ── */}

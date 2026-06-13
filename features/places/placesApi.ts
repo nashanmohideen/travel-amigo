@@ -57,50 +57,43 @@ export const placesApi = baseApi.injectEndpoints({
     }),
 
     /**
-     * Search places with optional filters.
+     * Search places with optional filters (PlacesModule).
      *
-     * Future implementation:
-     *   GET /api/places/search?destination=ella&interests=nature&travelStyle=budget
-     *   response: Place[] (ranked by relevance)
-     *
-     * Params:
-     *   - destination: filter by destination
-     *   - interests: filter by user interests
-     *   - travelStyle: filter by budget level
-     *   - category: filter by place category
-     *
-     * Currently not used (static data + client-side ranking).
+     * GET /api/v1/places?destination=ella&interests=nature,photography&travelStyle=budget&category=nature
+     * response: Place[]
      */
     searchPlaces: builder.query<Place[], PlaceSearchParams>({
       query: (params) => ({
-        url: "/places/search",
-        params,
+        url: "/places",
+        params: {
+          destination: params.destination,
+          category: params.category,
+          travelStyle: params.travelStyle,
+          interests: params.interests?.join(","),
+        },
       }),
       providesTags: ["Place"],
     }),
 
     /**
-     * Fetch places for a specific destination.
+     * Fetch places for a specific destination (PlacesModule).
      *
-     * Future implementation:
-     *   GET /api/destinations/:id/places
-     *   response: Place[]
-     *
-     * Currently not used (static data from data/places.ts).
+     * GET /api/v1/places?destination=:id
+     * response: Place[]
      */
     getDestinationPlaces: builder.query<Place[], string>({
-      query: (destinationId) => `/destinations/${destinationId}/places`,
+      query: (destinationId) => ({
+        url: "/places",
+        params: { destination: destinationId },
+      }),
       providesTags: ["Place"],
     }),
 
     /**
-     * Fetch a single place by ID.
+     * Fetch a single place by ID (PlacesModule).
      *
-     * Future implementation:
-     *   GET /api/places/:id
-     *   response: Place
-     *
-     * Currently not used.
+     * GET /api/v1/places/:id
+     * response: Place (+ rating/openingHours enriched via cached Google data)
      */
     getPlace: builder.query<Place, string>({
       query: (id) => `/places/${id}`,

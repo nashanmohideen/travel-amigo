@@ -1,38 +1,57 @@
 /**
  * Base RTK Query API configuration for Travel Amigo.
  *
- * This is foundation-only; no actual backend endpoints are called yet.
- * The API layer is prepared for Phase 8 backend integration.
+ * All requests are executed through the shared axios instance in
+ * lib/api-client.ts, which targets the NestJS backend
+ * (NEXT_PUBLIC_API_URL + /api/v1) and handles:
+ *   - access-token attachment (in-memory store, not localStorage)
+ *   - 401 → refresh-token rotation → single retry → /login redirect
  *
- * Configuration:
- *   - Base URL: NEXT_PUBLIC_API_BASE_URL env var, or "/api" fallback
- *   - Credentials: include (for future cookie-based auth)
- *   - TagTypes: entities for cache invalidation
- *
- * Philosophy:
- *   - All reducers and hooks are generated but not yet wired to UI
- *   - localStorage remains the source of truth for now
- *   - When backend endpoints are ready, simply implement endpoint definitions
+ * Errors surface in the standard ApiError shape returned by the backend
+ * ({ message, code, details? }), matching features/api/apiTypes.ts.
  */
 
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { createApi, type BaseQueryFn } from "@reduxjs/toolkit/query/react";
+import { AxiosError, type AxiosRequestConfig } from "axios";
+import { apiClient } from "@/lib/api-client";
+import type { ApiError } from "@/features/api/apiTypes";
 
-// ── Configuration ─────────────────────────────────────────────────────────
+// ── Axios-backed base query ───────────────────────────────────────────────
 
-const baseUrl =
-  typeof window !== "undefined"
-    ? process.env.NEXT_PUBLIC_API_BASE_URL || "/api"
-    : process.env.NEXT_PUBLIC_API_BASE_URL || "/api";
+interface AxiosBaseQueryArgs {
+  url: string;
+  method?: AxiosRequestConfig["method"];
+  body?: unknown;
+  params?: AxiosRequestConfig["params"];
+}
 
-// ── Base Query ────────────────────────────────────────────────────────────
-
-const baseQuery = fetchBaseQuery({
-  baseUrl,
-  credentials: "include", // For future cookie-based auth
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
+const axiosBaseQuery: BaseQueryFn<
+  AxiosBaseQueryArgs | string,
+  unknown,
+  { status?: number; data: ApiError }
+> = async (args) => {
+  const config: AxiosBaseQueryArgs = typeof args === "string" ? { url: args } : args;
+  try {
+    const result = await apiClient.request({
+      url: config.url,
+      method: config.method ?? "GET",
+      data: config.body,
+      params: config.params,
+    });
+    return { data: result.data };
+  } catch (err) {
+    const axiosError = err as AxiosError<ApiError>;
+    return {
+      error: {
+        status: axiosError.response?.status,
+        data: axiosError.response?.data ?? {
+          message: axiosError.message,
+          code: "NETWORK_ERROR",
+        },
+      },
+    };
+  }
+};
 
 // ── Tag Types ─────────────────────────────────────────────────────────────
 
@@ -54,7 +73,7 @@ export const tagTypes = [
 
 export const baseApi = createApi({
   reducerPath: "baseApi",
-  baseQuery,
+  baseQuery: axiosBaseQuery,
   tagTypes,
   endpoints: () => ({}),
 });

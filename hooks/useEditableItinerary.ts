@@ -81,7 +81,8 @@ export interface EditableItineraryState {
   replacePlace(dayIndex: number, itemId: string, newPlace: Place): void;
   movePlaceUp(dayIndex: number, itemIndex: number): void;
   movePlaceDown(dayIndex: number, itemIndex: number): void;
-  changePace(pace: TripPace): void;
+  /** Async: regenerates via POST /api/v1/trips/generate (local fallback). */
+  changePace(pace: TripPace): Promise<void>;
   resetToGenerated(): void;
   startOver(): void;
   /** Returns ranked alternative places (excludes already-used ones). */
@@ -186,7 +187,7 @@ export function useEditableItinerary(): EditableItineraryState {
 
       // Fresh generation — use API first with local fallback
       if (!input) input = createDefaultTripInput();
-      const { itinerary: fresh, source } = await generateWithApiFallback(input);
+      const { itinerary: fresh } = await generateWithApiFallback(input);
       
       if (isMounted) {
         // Determine the source label: prioritize "generated" (API + gotStorage) or "fallback"

@@ -15,7 +15,8 @@ import { cn } from "@/lib/utils";
 
 interface MockAssistantPanelProps {
   itinerary: GeneratedItinerary;
-  onChangePace: (pace: TripPace) => void;
+  /** May be async — pace changes regenerate via POST /api/v1/trips/generate */
+  onChangePace: (pace: TripPace) => void | Promise<void>;
   onReplacePlace: (dayIndex: number, itemId: string, newPlace: Place) => void;
 }
 
@@ -59,6 +60,7 @@ function ReplacementRow({ r }: { r: CheaperReplacement }) {
 interface ResponseViewProps {
   response: AssistantResponse;
   actionApplied: boolean;
+  isApplying: boolean;
   onApplyCheaper: () => void;
   onChangeRelax: () => void;
 }
@@ -66,6 +68,7 @@ interface ResponseViewProps {
 function ResponseView({
   response,
   actionApplied,
+  isApplying,
   onApplyCheaper,
   onChangeRelax,
 }: ResponseViewProps) {
@@ -119,9 +122,10 @@ function ResponseView({
           <button
             type="button"
             onClick={onApplyCheaper}
-            className="rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 transition-colors w-full"
+            disabled={isApplying}
+            className="rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 transition-colors w-full disabled:opacity-60 disabled:cursor-wait"
           >
-            {response.actionLabel ?? "Apply cheaper plan"}
+            {isApplying ? "Applying…" : (response.actionLabel ?? "Apply cheaper plan")}
           </button>
         )}
 
@@ -130,9 +134,10 @@ function ResponseView({
         <button
           type="button"
           onClick={onChangeRelax}
-          className="rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 transition-colors w-full"
+          disabled={isApplying}
+          className="rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 transition-colors w-full disabled:opacity-60 disabled:cursor-wait"
         >
-          {response.actionLabel ?? "Switch to Relaxed pace"}
+          {isApplying ? "Regenerating itinerary…" : (response.actionLabel ?? "Switch to Relaxed pace")}
         </button>
       )}
 
@@ -159,6 +164,7 @@ export default function MockAssistantPanel({
   );
   const [response, setResponse] = useState<AssistantResponse | null>(null);
   const [actionApplied, setActionApplied] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
 
   function handlePrompt(id: AssistantPromptId) {
     const res = buildAssistantResponse(id, itinerary);
@@ -175,9 +181,15 @@ export default function MockAssistantPanel({
     setActionApplied(true);
   }
 
-  function handleChangeRelax() {
-    onChangePace("relaxed");
-    setActionApplied(true);
+  async function handleChangeRelax() {
+    setIsApplying(true);
+    try {
+      // Regenerates via POST /api/v1/trips/generate — show loading meanwhile
+      await Promise.resolve(onChangePace("relaxed"));
+      setActionApplied(true);
+    } finally {
+      setIsApplying(false);
+    }
   }
 
   const activeLabel =
@@ -270,6 +282,7 @@ export default function MockAssistantPanel({
                   <ResponseView
                     response={response}
                     actionApplied={actionApplied}
+                    isApplying={isApplying}
                     onApplyCheaper={handleApplyCheaper}
                     onChangeRelax={handleChangeRelax}
                   />

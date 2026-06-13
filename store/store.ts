@@ -5,6 +5,7 @@
  *   tripDraft   — active trip planning form data (/plan)
  *   ui          — app-level UI flags (modals, toasts, global loading)
  *   itinerary   — active generated/edited itinerary
+ *   auth        — logged-in user, access token (in-memory), session status
  *   baseApi     — RTK Query API endpoints (Phase 7+)
  *
  * Middleware:
@@ -20,6 +21,7 @@ import { configureStore } from "@reduxjs/toolkit";
 import tripDraftReducer from "@/features/trips/tripDraftSlice";
 import uiReducer from "@/features/ui/uiSlice";
 import itineraryReducer from "@/features/itinerary/itinerarySlice";
+import authReducer from "@/features/auth/authSlice";
 import { baseApi } from "@/features/api/baseApi";
 
 export const store = configureStore({
@@ -27,6 +29,7 @@ export const store = configureStore({
     tripDraft: tripDraftReducer,
     ui: uiReducer,
     itinerary: itineraryReducer,
+    auth: authReducer,
     [baseApi.reducerPath]: baseApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>

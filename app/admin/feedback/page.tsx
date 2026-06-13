@@ -3,11 +3,11 @@ import AdminRoute from "@/components/auth/AdminRoute";
 import FeedbackDashboard from "@/components/features/FeedbackDashboard";
 
 export const metadata: Metadata = {
-  title: "Feedback — Travel Amigo",
+  title: "Admin · Feedback — Travel Amigo",
 };
 
-/** GET /api/v1/feedback is admin-gated — non-admins get the inline 403 message. */
-export default function FeedbackPage() {
+/** Admin home for feedback review — same dashboard as /feedback, admin-gated. */
+export default function AdminFeedbackPage() {
   return (
     <AdminRoute>
       <FeedbackDashboard />

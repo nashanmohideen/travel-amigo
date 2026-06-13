@@ -1,17 +1,44 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import Button from "@/components/ui/Button";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { logout } from "@/features/auth/authSlice";
+import { useLogoutMutation } from "@/features/auth/authApi";
+import { clearAuthTokens } from "@/lib/api-client";
 
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/plan", label: "Plan a Trip" },
 ];
 
+const linkClass = (active: boolean) =>
+  cn(
+    "text-sm font-medium transition-colors hover:text-teal-700",
+    active ? "text-teal-700" : "text-stone-500",
+  );
+
 export default function Header() {
   const pathname = usePathname();
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+
+  const { user, status } = useAppSelector((s) => s.auth);
+  const [logoutRequest, { isLoading: isSigningOut }] = useLogoutMutation();
+
+  async function handleSignOut() {
+    try {
+      // Revoke the refresh token server-side; local cleanup happens regardless
+      await logoutRequest().unwrap();
+    } catch {
+      /* token may already be invalid — still sign out locally */
+    }
+    clearAuthTokens();
+    dispatch(logout());
+    router.push("/");
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-stone-100 bg-white/90 backdrop-blur-sm">
@@ -30,24 +57,63 @@ export default function Header() {
             <Link
               key={link.href}
               href={link.href}
-              className={cn(
-                "text-sm font-medium transition-colors hover:text-teal-700",
-                pathname === link.href
-                  ? "text-teal-700"
-                  : "text-stone-500",
-              )}
+              className={linkClass(pathname === link.href)}
             >
               {link.label}
             </Link>
           ))}
+          {status === "authenticated" && (
+            <Link href="/trips" className={linkClass(pathname === "/trips")}>
+              My trips
+            </Link>
+          )}
+          {user?.role === "admin" && (
+            <Link
+              href="/admin/feedback"
+              className={linkClass(pathname === "/admin/feedback")}
+            >
+              Admin
+            </Link>
+          )}
         </nav>
 
-        {/* CTA */}
-        <Link href="/plan">
-          <Button size="sm" variant="primary">
-            Plan My Trip
-          </Button>
-        </Link>
+        {/* Auth state + CTA */}
+        <div className="flex items-center gap-4">
+          {status === "authenticated" && user ? (
+            <>
+              <span
+                className="hidden sm:block max-w-[160px] truncate text-sm font-medium text-stone-500"
+                title={user.email}
+              >
+                {user.email}
+              </span>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                disabled={isSigningOut}
+                className="text-sm font-medium text-stone-500 transition-colors hover:text-teal-700 disabled:opacity-50"
+              >
+                Sign out
+              </button>
+            </>
+          ) : (
+            status === "unauthenticated" && (
+              <>
+                <Link href="/login" className={linkClass(pathname === "/login")}>
+                  Sign in
+                </Link>
+                <Link href="/register" className={linkClass(pathname === "/register")}>
+                  Sign up
+                </Link>
+              </>
+            )
+          )}
+          <Link href="/plan">
+            <Button size="sm" variant="primary">
+              Plan My Trip
+            </Button>
+          </Link>
+        </div>
       </div>
     </header>
   );

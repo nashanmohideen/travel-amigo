@@ -3,43 +3,23 @@
 import { useEffect, useState } from "react";
 import type { GeneratedItinerary } from "@/types";
 import { useCreateShareLinkMutation } from "@/features/share/shareApi";
-import { LS_SHARED_ITINERARY_DEMO as LS_SHARED } from "@/lib/storageKeys";
 
 interface ShareModalProps {
   itinerary: GeneratedItinerary;
   onClose: () => void;
 }
 
-/**
- * Saves the itinerary to localStorage as a backup.
- * This ensures /shared/demo always works, even if API fails.
- */
-function saveToLocalStorage(itinerary: GeneratedItinerary): void {
-  try {
-    localStorage.setItem(LS_SHARED, JSON.stringify(itinerary));
-  } catch {
-    /* quota exceeded — silently skip */
-  }
-}
-
-/**
- * Build fallback URL using localStorage.
- */
-function getFallbackUrl(): string {
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-  return `${origin}/shared/demo`;
-}
-
 export default function ShareModal({ itinerary, onClose }: ShareModalProps) {
   const [createShareLink] = useCreateShareLinkMutation();
-  
+
   const [link, setLink] = useState("");
   const [copied, setCopied] = useState(false);
   const [isCreating, setIsCreating] = useState(true);
   const [syncNote, setSyncNote] = useState<string | null>(null);
 
-  // Create share link on mount (once per modal open)
+  // Create share link on mount (once per modal open).
+  // Share links are server-side tokens (POST /api/v1/share) — the old
+  // browser-local localStorage share has been removed.
   useEffect(() => {
     let isMounted = true;
 
@@ -47,27 +27,20 @@ export default function ShareModal({ itinerary, onClose }: ShareModalProps) {
       setIsCreating(true);
       setSyncNote(null);
 
-      // Always save to localStorage first
-      saveToLocalStorage(itinerary);
-
-      // Try API share link creation
       try {
         const result = await createShareLink({ itinerary }).unwrap();
-        
+
         if (isMounted) {
-          // Use API URL
           setLink(result.url);
           setSyncNote(null);
         }
       } catch (err) {
-        // API failed — use fallback
         console.error("Failed to create share link via API:", err);
-        
+
         if (isMounted) {
-          const fallbackUrl = getFallbackUrl();
-          setLink(fallbackUrl);
+          setLink("");
           setSyncNote(
-            "Using browser-local prototype sharing because server sharing is unavailable."
+            "Could not create a share link — the server is unavailable. Please try again later."
           );
         }
       } finally {

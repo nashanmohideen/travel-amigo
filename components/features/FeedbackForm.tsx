@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import type {
-  FeedbackSubmission,
   FeedbackWouldUse,
   FeedbackBudgetRealism,
   FeedbackWantedNext,
@@ -11,33 +10,10 @@ import type {
 import { FEEDBACK_WANTED_NEXT_OPTIONS } from "@/types";
 import { useSubmitFeedbackMutation } from "@/features/feedback/feedbackApi";
 import { cn } from "@/lib/utils";
-import { LS_FEEDBACK_SUBMISSIONS as LS_FEEDBACK } from "@/lib/storageKeys";
 
 interface FeedbackFormProps {
   itinerary: GeneratedItinerary;
   wasEdited: boolean;
-}
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-function loadSubmissions(): FeedbackSubmission[] {
-  try {
-    const raw = localStorage.getItem(LS_FEEDBACK);
-    if (raw) return JSON.parse(raw) as FeedbackSubmission[];
-  } catch {
-    /* ignore */
-  }
-  return [];
-}
-
-function saveSubmission(sub: FeedbackSubmission): void {
-  try {
-    const existing = loadSubmissions();
-    existing.push(sub);
-    localStorage.setItem(LS_FEEDBACK, JSON.stringify(existing));
-  } catch {
-    /* quota exceeded — silently skip */
-  }
 }
 
 // ── sub-components ────────────────────────────────────────────────────────────
@@ -112,7 +88,6 @@ export default function FeedbackForm({ itinerary, wasEdited }: FeedbackFormProps
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [syncNote, setSyncNote] = useState<string | null>(null);
 
   function toggleWanted(opt: FeedbackWantedNext) {
     setWantedNext((prev) => {
@@ -130,15 +105,13 @@ export default function FeedbackForm({ itinerary, wasEdited }: FeedbackFormProps
       return;
     }
     setError(null);
-    setSyncNote(null);
     setIsSubmitting(true);
 
     const tripInput = itinerary.tripInput;
-    
-    // Build the submission object with server-generated fields for local storage
-    const sub: FeedbackSubmission = {
-      id: `fb-${Date.now()}`,
-      createdAt: new Date().toISOString(),
+
+    // Feedback is stored server-side only (POST /api/v1/feedback) — the
+    // localStorage copy has been removed.
+    const apiInput = {
       itineraryId: itinerary.id ?? null,
       destination: tripInput?.destination ?? null,
       durationDays: tripInput?.duration ?? null,
@@ -156,54 +129,18 @@ export default function FeedbackForm({ itinerary, wasEdited }: FeedbackFormProps
       missingOrUnrealistic: missing.trim(),
       wantedNext: Array.from(wantedNext),
       wasEdited,
-      source: "itinerary_page",
+      source: "itinerary_page" as const,
     };
 
-    // Build the API input (everything except id and createdAt)
-    const apiInput = {
-      itineraryId: sub.itineraryId,
-      destination: sub.destination,
-      durationDays: sub.durationDays,
-      travellerCount: sub.travellerCount,
-      travelStyle: sub.travelStyle,
-      transportMode: sub.transportMode,
-      pace: sub.pace,
-      budgetStatus: sub.budgetStatus,
-      budgetConfidence: sub.budgetConfidence,
-      estimatedTotalLkr: sub.estimatedTotalLkr,
-      userBudgetLkr: sub.userBudgetLkr,
-      wouldUse: sub.wouldUse,
-      usefulnessRating: sub.usefulnessRating,
-      budgetRealism: sub.budgetRealism,
-      missingOrUnrealistic: sub.missingOrUnrealistic,
-      wantedNext: sub.wantedNext,
-      wasEdited: sub.wasEdited,
-      source: sub.source,
-    };
-
-    // Try API submission first
-    let apiSucceeded = false;
     try {
-      const result = await submitFeedback(apiInput).unwrap();
-      apiSucceeded = true;
-      
-      // If API returns an id, use it for the local copy
-      if (result.id) {
-        sub.id = result.id;
-      }
+      await submitFeedback(apiInput).unwrap();
+      setSubmitted(true);
     } catch (err) {
-      // API failed — we'll still save locally
       console.error("Feedback API submission failed:", err);
-      setSyncNote(
-        "Saved locally for prototype review. Server sync was unavailable."
-      );
+      setError("Could not submit feedback — the server is unavailable. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // Always save a local copy (whether API succeeded or failed)
-    saveSubmission(sub);
-    
-    setIsSubmitting(false);
-    setSubmitted(true);
   }
 
   if (submitted) {
@@ -213,9 +150,6 @@ export default function FeedbackForm({ itinerary, wasEdited }: FeedbackFormProps
         <p className="text-sm text-teal-700">
           Your feedback was saved for prototype review.
         </p>
-        {syncNote && (
-          <p className="text-xs text-teal-600 mt-2 italic">{syncNote}</p>
-        )}
       </div>
     );
   }
