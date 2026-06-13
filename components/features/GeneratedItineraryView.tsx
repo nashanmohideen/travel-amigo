@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type {
   GeneratedItinerary,
   ItineraryItem,
@@ -11,6 +11,9 @@ import type {
   BudgetStatus,
 } from "@/types";
 import { useEditableItinerary } from "@/hooks/useEditableItinerary";
+import { useSaveItineraryMutation } from "@/features/itinerary/itineraryApi";
+import { useAppSelector } from "@/store/hooks";
+import { LS_EDITED_ITINERARY } from "@/lib/storageKeys";
 import GeneratedItineraryCard from "@/components/features/GeneratedItineraryCard";
 import GeneratedBudgetSummary from "@/components/features/GeneratedBudgetSummary";
 import ReplacePlaceModal from "@/components/features/ReplacePlaceModal";
@@ -18,22 +21,10 @@ import ShareModal from "@/components/features/ShareModal";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
+import { formatDisplayDate } from "@/lib/formatters";
+import { getWarningSeverity } from "@/lib/itinerary/itineraryHelpers";
 import FeedbackForm from "@/components/features/FeedbackForm";
 import MockAssistantPanel from "@/components/features/MockAssistantPanel";
-
-/* ─── formatDate ───────────────────────────────────────────── */
-
-function formatDate(iso: string) {
-  try {
-    return new Date(iso).toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return iso;
-  }
-}
 
 /* ─── label maps ───────────────────────────────────────────── */
 
@@ -42,40 +33,6 @@ const TRANSPORT_LABEL: Record<string, string> = {
   private: "🚗 Private vehicle",
   mixed: "🔀 Mixed transport",
 };
-
-/* ─── Warnings panel ───────────────────────────────────────── */
-
-const WARNING_SEVERITY: Record<
-  string,
-  { icon: string; bg: string; border: string; text: string }
-> = {
-  over_budget: {
-    icon: "⛔",
-    bg: "bg-red-50",
-    border: "border-red-300",
-    text: "text-red-700",
-  },
-  tight_budget: {
-    icon: "⚠️",
-    bg: "bg-amber-50",
-    border: "border-amber-300",
-    text: "text-amber-700",
-  },
-  default: {
-    icon: "ℹ️",
-    bg: "bg-sky-50",
-    border: "border-sky-200",
-    text: "text-sky-700",
-  },
-};
-
-function warningSeverity(budgetStatus: BudgetStatus, text: string) {
-  if (budgetStatus === "over_budget" && text.toLowerCase().includes("budget"))
-    return WARNING_SEVERITY.over_budget;
-  if (budgetStatus === "tight_budget" && text.toLowerCase().includes("budget"))
-    return WARNING_SEVERITY.tight_budget;
-  return WARNING_SEVERITY.default;
-}
 
 /* ─── Pace selector ────────────────────────────────────────── */
 
@@ -169,6 +126,8 @@ interface ActionPanelProps {
   onStartOver: () => void;
   onShare: () => void;
   onPrint: () => void;
+  onSave: () => void;
+  isSaving: boolean;
   pace: TripPace;
   onPaceChange: (p: TripPace) => void;
 }
@@ -179,6 +138,8 @@ function ActionPanel({
   onStartOver,
   onShare,
   onPrint,
+  onSave,
+  isSaving,
   pace,
   onPaceChange,
 }: ActionPanelProps) {
@@ -194,6 +155,15 @@ function ActionPanel({
             ✏️ Edit preferences
           </Button>
         </Link>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start"
+          disabled={isSaving}
+          onClick={onSave}
+        >
+          💾 {isSaving ? "Saving..." : "Save trip"}
+        </Button>
         <Button
           variant="ghost"
           size="sm"
@@ -236,6 +206,37 @@ function ActionPanel({
         </Button>
       </div>
     </Card>
+  );
+}
+
+/* ─── Guest save prompt ───────────────────────────────────── */
+
+function GuestSavePrompt({
+  redirectPath,
+  onDismiss,
+}: {
+  redirectPath: string;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 max-w-sm w-[calc(100%-2rem)] rounded-2xl bg-stone-900 px-4 py-3 shadow-xl text-white text-sm font-medium animate-in fade-in slide-in-from-bottom-2">
+      <span className="flex-1">
+        Sign in to save your trip to your account.{" "}
+        <Link
+          href={`/login?redirect=${encodeURIComponent(redirectPath)}`}
+          className="underline font-semibold text-teal-300 hover:text-teal-200"
+        >
+          Sign in
+        </Link>
+      </span>
+      <button
+        onClick={onDismiss}
+        className="shrink-0 text-stone-400 hover:text-white transition-colors text-xs"
+        aria-label="Dismiss"
+      >
+        ✕
+      </button>
+    </div>
   );
 }
 
@@ -309,6 +310,36 @@ export default function GeneratedItineraryView() {
   /* ── Share modal ── */
   const [shareOpen, setShareOpen] = useState(false);
 
+  /* ── Save itinerary (POST /api/v1/trips, auth required) ── */
+  const pathname = usePathname();
+  const authStatus = useAppSelector((s) => s.auth.status);
+  const [saveItinerary, { isLoading: isSaving }] = useSaveItineraryMutation();
+  const [showGuestPrompt, setShowGuestPrompt] = useState(false);
+
+  async function handleSave() {
+    if (!itinerary) return;
+
+    // Guests keep the existing localStorage persistence (useEditableItinerary
+    // already writes ta_edited_itinerary) and are prompted to sign in instead.
+    if (authStatus !== "authenticated") {
+      setShowGuestPrompt(true);
+      return;
+    }
+
+    try {
+      const result = await saveItinerary(itinerary).unwrap();
+      // The trip now lives server-side — drop the localStorage copy and move
+      // to the bookmarkable detail page.
+      try {
+        localStorage.removeItem(LS_EDITED_ITINERARY);
+      } catch {}
+      setNotification("Trip saved to your account.");
+      router.push(`/trips/${result.id}`);
+    } catch {
+      setNotification("Could not save your trip — please try again.");
+    }
+  }
+
   /* ── Replace modal ── */
   const [replaceState, setReplaceState] = useState<ReplaceState>({
     open: false,
@@ -365,7 +396,7 @@ export default function GeneratedItineraryView() {
     balanced: "⚖️ Balanced",
     packed: "⚡ Packed",
   }[tripInput.pace] ?? tripInput.pace;
-  const generatedLabel = `📅 ${formatDate(itinerary.generatedAt)}`;
+  const generatedLabel = `📅 ${formatDisplayDate(itinerary.generatedAt)}`;
 
   /* Build callbacks once; stable references because hook fns are useCallback */
   const makeCallbacks = (dayIndex: number) => ({
@@ -452,7 +483,7 @@ export default function GeneratedItineraryView() {
         <div className="mx-auto max-w-6xl px-4 pt-6">
           <div className="flex flex-col gap-2">
             {warnings.map((w, i) => {
-              const sev = warningSeverity(budgetStatus, w);
+              const sev = getWarningSeverity(budgetStatus, w);
               return (
                 <div
                   key={i}
@@ -539,6 +570,8 @@ export default function GeneratedItineraryView() {
               onStartOver={handleStartOver}
               onShare={() => setShareOpen(true)}
               onPrint={handlePrint}
+              onSave={handleSave}
+              isSaving={isSaving}
               pace={tripInput.pace}
               onPaceChange={changePace}
             />
@@ -561,6 +594,14 @@ export default function GeneratedItineraryView() {
           alternatives={replaceState.alternatives}
           onSelect={handleReplaceSelect}
           onClose={() => setReplaceState((s) => ({ ...s, open: false }))}
+        />
+      )}
+
+      {/* ── Guest save prompt ── */}
+      {showGuestPrompt && (
+        <GuestSavePrompt
+          redirectPath={pathname}
+          onDismiss={() => setShowGuestPrompt(false)}
         />
       )}
 

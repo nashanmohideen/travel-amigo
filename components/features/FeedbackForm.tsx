@@ -2,42 +2,18 @@
 
 import { useState } from "react";
 import type {
-  FeedbackSubmission,
   FeedbackWouldUse,
   FeedbackBudgetRealism,
   FeedbackWantedNext,
   GeneratedItinerary,
 } from "@/types";
 import { FEEDBACK_WANTED_NEXT_OPTIONS } from "@/types";
+import { useSubmitFeedbackMutation } from "@/features/feedback/feedbackApi";
 import { cn } from "@/lib/utils";
-
-export const LS_FEEDBACK = "ta_feedback_submissions";
 
 interface FeedbackFormProps {
   itinerary: GeneratedItinerary;
   wasEdited: boolean;
-}
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-function loadSubmissions(): FeedbackSubmission[] {
-  try {
-    const raw = localStorage.getItem(LS_FEEDBACK);
-    if (raw) return JSON.parse(raw) as FeedbackSubmission[];
-  } catch {
-    /* ignore */
-  }
-  return [];
-}
-
-function saveSubmission(sub: FeedbackSubmission): void {
-  try {
-    const existing = loadSubmissions();
-    existing.push(sub);
-    localStorage.setItem(LS_FEEDBACK, JSON.stringify(existing));
-  } catch {
-    /* quota exceeded — silently skip */
-  }
 }
 
 // ── sub-components ────────────────────────────────────────────────────────────
@@ -102,6 +78,8 @@ function StarRating({
 // ── main component ────────────────────────────────────────────────────────────
 
 export default function FeedbackForm({ itinerary, wasEdited }: FeedbackFormProps) {
+  const [submitFeedback] = useSubmitFeedbackMutation();
+  
   const [wouldUse, setWouldUse] = useState<FeedbackWouldUse | null>(null);
   const [rating, setRating] = useState(0);
   const [budgetRealism, setBudgetRealism] = useState<FeedbackBudgetRealism | null>(null);
@@ -109,6 +87,7 @@ export default function FeedbackForm({ itinerary, wasEdited }: FeedbackFormProps
   const [wantedNext, setWantedNext] = useState<Set<FeedbackWantedNext>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   function toggleWanted(opt: FeedbackWantedNext) {
     setWantedNext((prev) => {
@@ -119,18 +98,20 @@ export default function FeedbackForm({ itinerary, wasEdited }: FeedbackFormProps
     });
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     // Validate required fields
     if (!wouldUse || !rating || !budgetRealism) {
       setError("Please answer all required questions (marked with *).");
       return;
     }
     setError(null);
+    setIsSubmitting(true);
 
     const tripInput = itinerary.tripInput;
-    const sub: FeedbackSubmission = {
-      id: `fb-${Date.now()}`,
-      createdAt: new Date().toISOString(),
+
+    // Feedback is stored server-side only (POST /api/v1/feedback) — the
+    // localStorage copy has been removed.
+    const apiInput = {
       itineraryId: itinerary.id ?? null,
       destination: tripInput?.destination ?? null,
       durationDays: tripInput?.duration ?? null,
@@ -148,11 +129,18 @@ export default function FeedbackForm({ itinerary, wasEdited }: FeedbackFormProps
       missingOrUnrealistic: missing.trim(),
       wantedNext: Array.from(wantedNext),
       wasEdited,
-      source: "itinerary_page",
+      source: "itinerary_page" as const,
     };
 
-    saveSubmission(sub);
-    setSubmitted(true);
+    try {
+      await submitFeedback(apiInput).unwrap();
+      setSubmitted(true);
+    } catch (err) {
+      console.error("Feedback API submission failed:", err);
+      setError("Could not submit feedback — the server is unavailable. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   if (submitted) {
@@ -294,9 +282,10 @@ export default function FeedbackForm({ itinerary, wasEdited }: FeedbackFormProps
       <button
         type="button"
         onClick={handleSubmit}
-        className="self-start rounded-xl bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 active:bg-teal-900 transition-colors"
+        disabled={isSubmitting}
+        className="self-start rounded-xl bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 active:bg-teal-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Submit feedback
+        {isSubmitting ? "Submitting..." : "Submit feedback"}
       </button>
     </div>
   );

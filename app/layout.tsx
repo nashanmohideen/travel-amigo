@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import ReduxProvider from "@/store/provider";
+import AuthBootstrap from "@/components/auth/AuthBootstrap";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -29,9 +31,12 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-white text-stone-900">
-        <Header />
-        <div className="flex-1 flex flex-col">{children}</div>
-        <Footer />
+        <ReduxProvider>
+          <AuthBootstrap />
+          <Header />
+          <div className="flex-1 flex flex-col">{children}</div>
+          <Footer />
+        </ReduxProvider>
       </body>
     </html>
   );

@@ -9,9 +9,12 @@ export const metadata: Metadata = {
 /**
  * /shared/[id]
  *
- * Server shell — rendering is delegated to the client component which reads
- * ta_shared_itinerary_demo from localStorage. The [id] segment is kept for
- * future extensibility; "demo" is the only supported value in this prototype.
+ * Server shell — rendering is delegated to the client component.
+ * The [id] segment is the share token or "demo" for localStorage-only fallback.
+ *
+ * Phase 16: Passes token to SharedItineraryView for RTK Query integration.
+ *   - If [id] === "demo": uses localStorage only (LS_SHARED_ITINERARY_DEMO)
+ *   - If [id] is a real token: tries API GET /api/share/[token], falls back to localStorage
  */
 export default async function SharedItineraryPage({
   params,
@@ -19,7 +22,7 @@ export default async function SharedItineraryPage({
   params: Promise<{ id: string }>;
 }) {
   // Await params as required by Next.js 16 App Router
-  await params;
+  const { id } = await params;
 
-  return <SharedItineraryView />;
+  return <SharedItineraryView token={id} />;
 }

@@ -1,19 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { GeneratedItinerary } from "@/types";
+import { useGetItineraryQuery } from "@/features/itinerary/itineraryApi";
 import GeneratedItineraryCard from "@/components/features/GeneratedItineraryCard";
 import GeneratedBudgetSummary from "@/components/features/GeneratedBudgetSummary";
 import Card from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
 import { formatDisplayDate } from "@/lib/formatters";
-import { isValidItinerary, getWarningSeverity } from "@/lib/itinerary/itineraryHelpers";
-import { useGetSharedItineraryQuery } from "@/features/share/shareApi";
+import { getWarningSeverity } from "@/lib/itinerary/itineraryHelpers";
 
 
 type Props = {
-  token?: string;
+  id: string;
 };
 
 const TRANSPORT_LABEL: Record<string, string> = {
@@ -59,67 +58,51 @@ function MapPlaceholder({ itinerary }: { itinerary: GeneratedItinerary }) {
   );
 }
 
-/* ─── Empty state ────────────────────────────────────────────── */
+/* ─── Not found state ────────────────────────────────────────── */
 
-function EmptyState() {
+function NotFoundState() {
   return (
     <div className="min-h-screen bg-stone-50 flex items-center justify-center px-4">
       <div className="text-center max-w-sm">
-        <div className="text-5xl mb-4">🔗</div>
+        <div className="text-5xl mb-4">💾</div>
         <h1 className="text-xl font-bold text-stone-800 mb-2">
-          Shared itinerary not available
+          Saved itinerary not found
         </h1>
-        <p className="text-sm text-stone-500 mb-6">
-          This shared itinerary is not available. It may have been cleared or
-          the link is expired.
+        <p className="text-sm text-stone-500 mb-4">
+          This itinerary is not available. It may have been cleared or the server has restarted.
+        </p>
+        <p className="text-xs text-stone-400 mb-6">
+          Note: This prototype uses temporary in-memory storage, so saved trips may disappear after a server restart.
         </p>
         <Link
           href="/plan"
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-700 px-6 py-3 text-sm font-semibold text-white hover:bg-teal-800 transition-colors"
         >
-          Create your own trip →
+          Create a new trip →
         </Link>
       </div>
     </div>
   );
 }
 
-/* ─── Main shared view ───────────────────────────────────────── */
+/* ─── Main saved itinerary view ────────────────────────────────────────── */
 
-export default function SharedItineraryView({ token = "demo" }: Props) {
-  const [itinerary, setItinerary] = useState<GeneratedItinerary | null | "loading">("loading");
+export default function SavedItineraryView({ id }: Props) {
+  // RTK Query hook: fetch saved itinerary by id
+  const { data: itinerary, isLoading, error } = useGetItineraryQuery(id);
 
-  // Shared itineraries are loaded from the backend only
-  // (GET /api/v1/share/:token) — the localStorage fallback has been removed.
-  const { data: apiItinerary, isLoading: apiIsLoading, error: apiError } =
-    useGetSharedItineraryQuery(token);
-
-  useEffect(() => {
-    if (apiIsLoading) {
-      setItinerary("loading");
-      return;
-    }
-    if (apiItinerary && isValidItinerary(apiItinerary)) {
-      setItinerary(apiItinerary);
-      return;
-    }
-    if (apiError || !apiItinerary) {
-      setItinerary(null);
-    }
-  }, [token, apiItinerary, apiIsLoading, apiError]);
-
-  if (itinerary === "loading") {
+  if (isLoading) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-3">✈️</div>
-          <p className="text-stone-500">Loading shared itinerary…</p>
+          <p className="text-stone-500">Loading saved itinerary…</p>
         </div>
       </div>
     );
   }
 
-  if (!itinerary) return <EmptyState />;
+  if (error || !itinerary) return <NotFoundState />;
 
   const { tripInput, budget, budgetStatus, budgetConfidence, warnings, tips } = itinerary;
   const transportLabel = TRANSPORT_LABEL[tripInput.transportMode] ?? tripInput.transportMode;
@@ -131,14 +114,17 @@ export default function SharedItineraryView({ token = "demo" }: Props) {
 
   return (
     <div className="min-h-screen bg-stone-50">
-      {/* ── Shared banner ── */}
+      {/* ── Saved itinerary banner ── */}
       <div className="bg-teal-50 border-b border-teal-200 px-4 py-3 text-center">
         <p className="text-sm text-teal-800">
-          <span className="font-semibold">Shared Travel Amigo itinerary</span>
+          <span className="font-semibold">Saved Travel Amigo itinerary</span>
           {" — "}
           <Link href="/plan" className="underline font-medium hover:text-teal-900">
-            Create your own trip →
+            Create another trip →
           </Link>
+        </p>
+        <p className="text-xs text-teal-600 mt-0.5">
+          This prototype uses temporary in-memory storage during development.
         </p>
       </div>
 
@@ -271,17 +257,27 @@ export default function SharedItineraryView({ token = "demo" }: Props) {
             <Card className="text-center flex flex-col items-center gap-3 py-6">
               <div className="text-3xl">🇱🇰</div>
               <p className="text-sm font-bold text-stone-800">
-                Inspired by this itinerary?
+                Want to plan another trip?
               </p>
               <p className="text-xs text-stone-500">
-                Create your personalised Sri Lanka trip for free.
+                Create your personalised Sri Lanka journey.
               </p>
               <Link
                 href="/plan"
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 transition-colors"
               >
-                Plan your own trip →
+                Plan a new trip →
               </Link>
+            </Card>
+
+            {/* Print info */}
+            <Card className="flex flex-col gap-2 bg-stone-100 border-stone-200 py-4 px-3">
+              <button
+                onClick={() => window.print()}
+                className="text-xs font-medium text-teal-700 hover:text-teal-800 transition-colors text-left flex items-center gap-1"
+              >
+                🖨️ Print this itinerary
+              </button>
             </Card>
           </div>
         </div>

@@ -3,34 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { FeedbackSubmission, FeedbackWouldUse, FeedbackWantedNext } from "@/types";
-import { LS_FEEDBACK } from "@/components/features/FeedbackForm";
+import { useGetFeedbackSubmissionsQuery } from "@/features/feedback/feedbackApi";
 import { cn } from "@/lib/utils";
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-function formatDate(iso: string) {
-  try {
-    return new Date(iso).toLocaleString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
-
-function loadSubmissions(): FeedbackSubmission[] {
-  try {
-    const raw = localStorage.getItem(LS_FEEDBACK);
-    if (raw) return JSON.parse(raw) as FeedbackSubmission[];
-  } catch {
-    /* ignore */
-  }
-  return [];
-}
+import { formatDateTime } from "@/lib/formatters";
 
 function topWantedNext(subs: FeedbackSubmission[]): FeedbackWantedNext | null {
   const counts = new Map<FeedbackWantedNext, number>();
@@ -150,7 +125,7 @@ function SubmissionRow({ sub }: { sub: FeedbackSubmission }) {
         className="w-full flex flex-wrap items-center gap-3 px-4 py-3 text-left hover:bg-stone-50 rounded-xl transition-colors"
       >
         <span className="text-xs text-stone-400 shrink-0 min-w-[120px]">
-          {formatDate(sub.createdAt)}
+          {formatDateTime(sub.createdAt)}
         </span>
         <span className="text-xs font-semibold text-stone-700 capitalize">
           {sub.destination ?? "—"}
@@ -252,13 +227,20 @@ function SubmissionRow({ sub }: { sub: FeedbackSubmission }) {
 // ── main component ────────────────────────────────────────────────────────────
 
 export default function FeedbackDashboard() {
+  // Feedback is server-side only (GET /api/v1/feedback, admin-gated) —
+  // the localStorage fallback has been removed.
+  const { data: apiItems = [], isLoading, error } = useGetFeedbackSubmissionsQuery();
+
   const [subs, setSubs] = useState<FeedbackSubmission[] | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSubs(loadSubmissions());
-  }, []);
+    if (isLoading) {
+      setSubs(null);
+    } else {
+      setSubs(apiItems);
+    }
+  }, [apiItems, isLoading, error]);
 
   async function handleCopyJSON() {
     if (!subs) return;
@@ -285,6 +267,11 @@ export default function FeedbackDashboard() {
       : "—";
   const top = topWantedNext(subs);
 
+  // GET /api/v1/feedback requires an admin session on the backend
+  const sourceMessage = error
+    ? "Could not load feedback from the server — this view requires an admin session."
+    : "Showing server feedback entries.";
+
   return (
     <div className="min-h-screen bg-stone-50">
       {/* Header */}
@@ -297,7 +284,7 @@ export default function FeedbackDashboard() {
             Feedback submissions
           </h1>
           <p className="text-sm text-stone-500 mt-1">
-            User feedback collected via the itinerary page, stored locally.
+            {sourceMessage}
           </p>
         </div>
       </div>

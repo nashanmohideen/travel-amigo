@@ -1,24 +1,40 @@
 "use client";
 
 /**
- * useEditableItinerary
+ * useEditableItinerary — Phase 4: Redux controller hook
  *
- * Manages the editable itinerary state with localStorage persistence.
+ * This hook is the single public interface for itinerary state on the
+ * /itinerary/demo page.  It bridges Redux (source of truth) and localStorage
+ * (persistence fallback) without leaking either concern into the UI.
  *
- * localStorage keys:
- *   ta_trip_input       — original / current TripInput (set by /plan form)
- *   ta_edited_itinerary — saved after any user edit; cleared on reset
+ * Responsibilities:
+ *  1. Hydrate Redux on mount from localStorage (LS_EDITED → LS_TRIP → demo fallback).
+ *  2. Persist the active itinerary to LS_EDITED_ITINERARY after every edit.
+ *  3. Expose the same public API surface as the Phase 3 version so that
+ *     GeneratedItineraryView requires zero import/JSX changes.
  *
- * Loading priority:
- *   1. ta_edited_itinerary (if valid)
- *   2. Generate from ta_trip_input
- *   3. Generate from createDefaultTripInput() (demo fallback)
+ * What this hook does NOT do (Redux architecture rule):
+ *  - Modify localStorage inside Redux reducers.
+ *  - Navigate or call window inside Redux reducers.
+ *  - Duplicate generation/budget logic (those live in lib/generateItinerary).
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import {
+  setActiveItinerary,
+  clearActiveItinerary,
+  clearLastAction as clearLastActionCreator,
+  removePlaceFromDay,
+  replacePlaceInDay,
+  movePlaceUp as movePlaceUpAction,
+  movePlaceDown as movePlaceDownAction,
+  setRegeneratedItinerary,
+} from "@/features/itinerary/itinerarySlice";
+import { resetTripDraft } from "@/features/trips/tripDraftSlice";
+import { useGenerateItineraryMutation } from "@/features/itinerary/itineraryApi";
 import type {
   GeneratedItinerary,
-  GeneratedItineraryDay,
   TripInput,
   TripPace,
   Place,
@@ -27,17 +43,17 @@ import type {
 import {
   generateItinerary,
   createDefaultTripInput,
-  reassignTimeSlots,
   placeToItineraryItem,
-  recalculateBudgetFromDays,
-  getBudgetStatus,
 } from "@/lib/generateItinerary";
 import { getPlacesByDestination, rankPlaces } from "@/lib/placeHelpers";
+import {
+  LS_TRIP_INPUT as LS_TRIP,
+  LS_EDITED_ITINERARY as LS_EDITED,
+  LS_SHARED_ITINERARY_DEMO,
+} from "@/lib/storageKeys";
+import { isValidItinerary } from "@/lib/itinerary/itineraryHelpers";
 
-export const LS_TRIP = "ta_trip_input";
-export const LS_EDITED = "ta_edited_itinerary";
-
-// ── helpers ───────────────────────────────────────────────────────────────────
+// ── localStorage helpers ───────────────────────────────────────────────────────
 
 function saveEdited(itinerary: GeneratedItinerary): void {
   try {
@@ -47,262 +63,298 @@ function saveEdited(itinerary: GeneratedItinerary): void {
   }
 }
 
-function isValidItinerary(obj: unknown): obj is GeneratedItinerary {
-  if (!obj || typeof obj !== "object") return false;
-  const g = obj as Record<string, unknown>;
-  return (
-    typeof g.id === "string" &&
-    Array.isArray(g.days) &&
-    typeof g.budget === "object" &&
-    typeof g.tripInput === "object"
-  );
-}
-
-// ── hook ──────────────────────────────────────────────────────────────────────
+// ── Public API type ────────────────────────────────────────────────────────────
 
 export interface EditableItineraryState {
-  /** The live itinerary — null only during SSR / initial load */
+  /** The live itinerary — null only during SSR / initial hydration */
   itinerary: GeneratedItinerary | null;
-  /** The current TripInput (may differ from itinerary.tripInput after pace change) */
+  /** The current TripInput (from itinerary.tripInput after hydration) */
   tripInput: TripInput | null;
-  /** True if trip data came from localStorage (i.e. user came from /plan) */
+  /** True if trip data came from localStorage (user came from /plan) */
   fromStorage: boolean;
   /** True if the user has made manual edits */
   isEdited: boolean;
-  /** Latest action message for toast display; null when no pending notification */
+  /** Latest action message for toast display; null = no pending notification */
   lastAction: string | null;
 
   removePlace(dayIndex: number, itemId: string): void;
   replacePlace(dayIndex: number, itemId: string, newPlace: Place): void;
   movePlaceUp(dayIndex: number, itemIndex: number): void;
   movePlaceDown(dayIndex: number, itemIndex: number): void;
-  changePace(pace: TripPace): void;
+  /** Async: regenerates via POST /api/v1/trips/generate (local fallback). */
+  changePace(pace: TripPace): Promise<void>;
   resetToGenerated(): void;
   startOver(): void;
-  /** Returns ranked alternative places (excludes already-used ones) */
+  /** Returns ranked alternative places (excludes already-used ones). */
   getAlternatives(dayIndex: number, itemId: string): Place[];
   clearLastAction(): void;
 }
 
+// ── Hook ──────────────────────────────────────────────────────────────────────
+
 export function useEditableItinerary(): EditableItineraryState {
-  const [itinerary, setItinerary] = useState<GeneratedItinerary | null>(null);
-  const [tripInput, setTripInput] = useState<TripInput | null>(null);
+  const dispatch = useAppDispatch();
+  const [generateMutation] = useGenerateItineraryMutation();
+
+  // ── Redux selectors ──────────────────────────────────────────────────────
+  const activeItinerary = useAppSelector((s) => s.itinerary.activeItinerary);
+  const itinerarySource = useAppSelector((s) => s.itinerary.source);
+  const isEdited = useAppSelector((s) => s.itinerary.isEdited);
+  const lastAction = useAppSelector((s) => s.itinerary.lastAction);
+
+  // ── Local state for values that only matter at mount time ────────────────
+  // fromStorage tracks whether the session started from a real user trip plan.
+  // It is set once during hydration and never changes, so useState is correct.
   const [fromStorage, setFromStorage] = useState(false);
-  const [isEdited, setIsEdited] = useState(false);
-  const [lastAction, setLastAction] = useState<string | null>(null);
 
-  // ── Initialise from localStorage ──────────────────────────────────────────
+  // Guard: skip the persistence effect until after hydration is complete.
+  const hydratedRef = useRef(false);
+
+  // Refs so performHydration reads current Redux values without adding them
+  // to the effect's dependency array (we only want the effect to run once).
+  const activeItineraryRef = useRef(activeItinerary);
+  activeItineraryRef.current = activeItinerary;
+  const itinerarySourceRef = useRef(itinerarySource);
+  itinerarySourceRef.current = itinerarySource;
+
+  // ── Helper: Try API generation with fallback to local generator ──────────
+  /**
+   * Attempts to generate an itinerary using the RTK Query mutation.
+   * If the API fails (network, timeout, 400/500), falls back to local generation.
+   * 
+   * Returns a promise that resolves to a GeneratedItinerary and  
+   * whether it came from the API or local fallback.
+   */
+  const generateWithApiFallback = useCallback(
+    async (input: TripInput): Promise<{
+      itinerary: GeneratedItinerary;
+      source: "api" | "local_fallback";
+    }> => {
+      try {
+        // Try the server API first
+        const apiItinerary = await generateMutation(input).unwrap();
+        return { itinerary: apiItinerary, source: "api" };
+      } catch (error) {
+        // API failed — fall back to local generation
+        // Silently use the local generator; we don't crash the page
+        const localItinerary = generateItinerary(input);
+        return { itinerary: localItinerary, source: "local_fallback" };
+      }
+    },
+    [generateMutation]
+  );
+
+  // ── Hydration from localStorage (runs once on mount) ────────────────────
   useEffect(() => {
-    // 1. Load trip input
-    let input: TripInput | null = null;
-    let gotStorage = false;
-    try {
-      const raw = localStorage.getItem(LS_TRIP);
-      if (raw) {
-        input = JSON.parse(raw) as TripInput;
-        gotStorage = true;
-      }
-    } catch {
-      /* invalid JSON */
-    }
+    let isMounted = true;
 
-    // 2. Try to restore edited itinerary
-    let edited: GeneratedItinerary | null = null;
-    try {
-      const raw = localStorage.getItem(LS_EDITED);
-      if (raw) {
-        const parsed: unknown = JSON.parse(raw);
-        if (isValidItinerary(parsed)) edited = parsed;
-      }
-    } catch {
-      /* malformed — ignore */
-    }
-
-    // 3. Decide what to display
-    // Setting state synchronously in this effect is intentional: we only run on mount
-    // to hydrate from localStorage, not in response to React state changes.
-    /* eslint-disable react-hooks/set-state-in-effect */
-    if (edited) {
-      // Sanity-check: destination must match current trip input (if any)
-      const destMatch =
-        !input || edited.tripInput?.destination === input.destination;
-      if (destMatch) {
-        setItinerary(edited);
-        setTripInput(input ?? edited.tripInput ?? createDefaultTripInput());
-        setFromStorage(gotStorage);
-        setIsEdited(true);
+    const performHydration = async () => {
+      // 0. If the form already generated and stored an itinerary in Redux
+      //    (source === "generated"), use it directly — skip re-fetch.
+      if (activeItineraryRef.current && itinerarySourceRef.current === "generated") {
+        if (isMounted) {
+          setFromStorage(true);
+          hydratedRef.current = true;
+        }
         return;
       }
-      // Edited itinerary is stale — discard it
+
+      // 1. Try to load trip input from localStorage
+      let input: TripInput | null = null;
+      let gotStorage = false;
       try {
-        localStorage.removeItem(LS_EDITED);
-      } catch {}
-    }
+        const raw = localStorage.getItem(LS_TRIP);
+        if (raw) {
+          input = JSON.parse(raw) as TripInput;
+          gotStorage = true;
+        }
+      } catch {
+        /* invalid JSON — treat as missing */
+      }
 
-    if (!input) input = createDefaultTripInput();
-    const fresh = generateItinerary(input);
-    setItinerary(fresh);
-    setTripInput(input);
-    setFromStorage(gotStorage);
-    setIsEdited(false);
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, []);
+      // 2. Try to restore a previously edited itinerary
+      let edited: GeneratedItinerary | null = null;
+      try {
+        const raw = localStorage.getItem(LS_EDITED);
+        if (raw) {
+          const parsed: unknown = JSON.parse(raw);
+          if (isValidItinerary(parsed)) edited = parsed;
+        }
+      } catch {
+        /* malformed — ignore */
+      }
 
-  // ── Shared derived state mutator ──────────────────────────────────────────
+      // 3. Decide what to load into Redux
+      if (edited) {
+        // Sanity-check: edited itinerary must match current trip destination
+        const destMatch =
+          !input || edited.tripInput?.destination === input.destination;
+        if (destMatch) {
+          if (isMounted) {
+            dispatch(setActiveItinerary({ itinerary: edited, source: "edited" }));
+            setFromStorage(gotStorage);
+            hydratedRef.current = true;
+          }
+          return;
+        }
+        // Stale edited itinerary (different destination) — discard it
+        try {
+          localStorage.removeItem(LS_EDITED);
+        } catch {}
+      }
 
-  /** Applies a day-level transform, recalculates budget, saves, notifies. */
-  function applyDayChange(
-    transform: (days: GeneratedItineraryDay[]) => GeneratedItineraryDay[],
-    message: string
-  ): void {
-    setItinerary((prev) => {
-      if (!prev) return prev;
-      const newDays = transform(prev.days);
-      const newBudget = recalculateBudgetFromDays(prev.budget, newDays, prev.tripInput);
-      const newStatus = getBudgetStatus(newBudget, prev.tripInput);
-      const updated: GeneratedItinerary = {
-        ...prev,
-        days: newDays,
-        budget: newBudget,
-        budgetStatus: newStatus,
-      };
-      saveEdited(updated);
-      return updated;
-    });
-    setIsEdited(true);
-    setLastAction(message);
-  }
+      // Fresh generation — use API first with local fallback
+      if (!input) input = createDefaultTripInput();
+      const { itinerary: fresh } = await generateWithApiFallback(input);
 
-  // ── Actions ───────────────────────────────────────────────────────────────
+      if (isMounted) {
+        // Determine the source label: prioritize "generated" (API + gotStorage) or "fallback"
+        const src = gotStorage ? "generated" : "fallback";
+        dispatch(setActiveItinerary({ itinerary: fresh, source: src }));
+        setFromStorage(gotStorage);
+        hydratedRef.current = true;
+      }
+    };
+
+    performHydration();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [dispatch, generateWithApiFallback]);
+
+  // ── Persist edited itinerary to localStorage after every edit ────────────
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    if (!activeItinerary || !isEdited) return;
+    saveEdited(activeItinerary);
+  }, [activeItinerary, isEdited]);
+
+  // ── Derived values ────────────────────────────────────────────────────────
+  const tripInput = activeItinerary?.tripInput ?? null;
+
+  // ── Edit actions ──────────────────────────────────────────────────────────
 
   const removePlace = useCallback(
     (dayIndex: number, itemId: string) => {
-      applyDayChange((days) =>
-        days.map((day, di) => {
-          if (di !== dayIndex) return day;
-          const newItems = reassignTimeSlots(day.items.filter((i) => i.id !== itemId));
-          return {
-            ...day,
-            items: newItems,
-            totalCostLkr: newItems.reduce((s, i) => s + i.estimatedCostLkr, 0),
-          };
-        }),
-        "Place removed from itinerary."
-      );
+      dispatch(removePlaceFromDay({ dayIndex, itemId }));
     },
-    []
+    [dispatch]
   );
 
   const replacePlace = useCallback(
     (dayIndex: number, itemId: string, newPlace: Place) => {
-      setItinerary((prev) => {
-        if (!prev) return prev;
-        const travelers = prev.tripInput.travelers;
-        const newItem = placeToItineraryItem(newPlace, travelers);
-        const newDays = prev.days.map((day, di) => {
-          if (di !== dayIndex) return day;
-          const newItems = reassignTimeSlots(
-            day.items.map((i) => (i.id === itemId ? newItem : i))
-          );
-          return {
-            ...day,
-            items: newItems,
-            totalCostLkr: newItems.reduce((s, i) => s + i.estimatedCostLkr, 0),
-          };
-        });
-        const newBudget = recalculateBudgetFromDays(prev.budget, newDays, prev.tripInput);
-        const newStatus = getBudgetStatus(newBudget, prev.tripInput);
-        const updated: GeneratedItinerary = { ...prev, days: newDays, budget: newBudget, budgetStatus: newStatus };
-        saveEdited(updated);
-        return updated;
-      });
-      setIsEdited(true);
-      setLastAction(`Replaced with ${newPlace.name}.`);
+      if (!activeItinerary) return;
+      const newItem = placeToItineraryItem(newPlace, activeItinerary.tripInput.travelers);
+      dispatch(replacePlaceInDay({ dayIndex, itemId, newItem }));
     },
-    []
+    [dispatch, activeItinerary]
   );
 
-  const movePlaceUp = useCallback((dayIndex: number, itemIndex: number) => {
-    applyDayChange((days) =>
-      days.map((day, di) => {
-        if (di !== dayIndex || itemIndex <= 0) return day;
-        const items = [...day.items];
-        [items[itemIndex - 1], items[itemIndex]] = [items[itemIndex], items[itemIndex - 1]];
-        return { ...day, items: reassignTimeSlots(items) };
-      }),
-      "Order updated."
-    );
-  }, []);
+  const movePlaceUp = useCallback(
+    (dayIndex: number, itemIndex: number) => {
+      dispatch(movePlaceUpAction({ dayIndex, itemIndex }));
+    },
+    [dispatch]
+  );
 
-  const movePlaceDown = useCallback((dayIndex: number, itemIndex: number) => {
-    applyDayChange((days) =>
-      days.map((day, di) => {
-        if (di !== dayIndex) return day;
-        if (itemIndex >= day.items.length - 1) return day;
-        const items = [...day.items];
-        [items[itemIndex], items[itemIndex + 1]] = [items[itemIndex + 1], items[itemIndex]];
-        return { ...day, items: reassignTimeSlots(items) };
-      }),
-      "Order updated."
-    );
-  }, []);
+  const movePlaceDown = useCallback(
+    (dayIndex: number, itemIndex: number) => {
+      dispatch(movePlaceDownAction({ dayIndex, itemIndex }));
+    },
+    [dispatch]
+  );
 
   const changePace = useCallback(
-    (pace: TripPace) => {
+    async (pace: TripPace) => {
       const input = tripInput ?? createDefaultTripInput();
       const newInput: TripInput = { ...input, pace };
-      const fresh = generateItinerary(newInput);
+      
+      // Try API generation with local fallback
       try {
-        localStorage.setItem(LS_TRIP, JSON.stringify(newInput));
-        saveEdited(fresh);
-      } catch {}
-      setTripInput(newInput);
-      setItinerary(fresh);
-      setIsEdited(true);
-      const label = { relaxed: "Relaxed", balanced: "Balanced", packed: "Packed" }[pace] ?? pace;
-      setLastAction(`Pace changed to ${label} — itinerary regenerated.`);
+        const { itinerary: fresh } = await generateWithApiFallback(newInput);
+        
+        // Write updated trip input to localStorage so it survives a page refresh
+        try {
+          localStorage.setItem(LS_TRIP, JSON.stringify(newInput));
+        } catch {}
+        
+        const label =
+          { relaxed: "Relaxed", balanced: "Balanced", packed: "Packed" }[pace] ?? pace;
+        dispatch(
+          setRegeneratedItinerary({
+            itinerary: fresh,
+            lastAction: `Pace changed to ${label} — itinerary regenerated.`,
+            markEdited: true,
+          })
+        );
+      } catch {
+        // Should not happen with local fallback, but handle gracefully
+        console.error("Failed to regenerate itinerary after pace change");
+      }
     },
-    [tripInput]
+    [dispatch, tripInput, generateWithApiFallback]
   );
 
-  const resetToGenerated = useCallback(() => {
+  const resetToGenerated = useCallback(async () => {
     try {
       localStorage.removeItem(LS_EDITED);
     } catch {}
     const input = tripInput ?? createDefaultTripInput();
-    const fresh = generateItinerary(input);
-    setItinerary(fresh);
-    setIsEdited(false);
-    setLastAction("Reset to original generated plan.");
-  }, [tripInput]);
+    
+    // Try API generation with local fallback
+    try {
+      const { itinerary: fresh } = await generateWithApiFallback(input);
+      dispatch(
+        setRegeneratedItinerary({
+          itinerary: fresh,
+          lastAction: "Reset to original generated plan.",
+          markEdited: false,
+        })
+      );
+    } catch {
+      // Should not happen with local fallback, but handle gracefully
+      console.error("Failed to regenerate itinerary after reset");
+    }
+  }, [dispatch, tripInput, generateWithApiFallback]);
 
   const startOver = useCallback(() => {
+    // Clear the three keys that belong to this session — never touch LS_FEEDBACK_SUBMISSIONS
     try {
       localStorage.removeItem(LS_TRIP);
       localStorage.removeItem(LS_EDITED);
-      localStorage.removeItem("ta_shared_itinerary_demo");
+      localStorage.removeItem(LS_SHARED_ITINERARY_DEMO);
     } catch {}
-  }, []);
+    dispatch(clearActiveItinerary());
+    dispatch(resetTripDraft());
+    // Navigation (router.push) intentionally stays in the calling component
+  }, [dispatch]);
 
   const getAlternatives = useCallback(
     (dayIndex: number, itemId: string): Place[] => {
-      if (!itinerary) return [];
-      const usedIds = new Set(itinerary.days.flatMap((d) => d.items.map((i) => i.placeId)));
-      // Keep the slot we're replacing available
-      const replacingItem = itinerary.days[dayIndex]?.items.find((i) => i.id === itemId);
+      if (!activeItinerary) return [];
+      const usedIds = new Set(
+        activeItinerary.days.flatMap((d) => d.items.map((i) => i.placeId))
+      );
+      // Keep the slot we're replacing available as an option
+      const replacingItem = activeItinerary.days[dayIndex]?.items.find(
+        (i) => i.id === itemId
+      );
       if (replacingItem) usedIds.delete(replacingItem.placeId);
 
-      const allForDest = getPlacesByDestination(itinerary.tripInput.destination);
+      const allForDest = getPlacesByDestination(activeItinerary.tripInput.destination);
       const available = allForDest.filter((p) => !usedIds.has(p.id));
-      return rankPlaces(available, itinerary.tripInput.interests as PlaceInterest[]);
+      return rankPlaces(available, activeItinerary.tripInput.interests as PlaceInterest[]);
     },
-    [itinerary]
+    [activeItinerary]
   );
 
-  const clearLastAction = useCallback(() => setLastAction(null), []);
+  const clearLastAction = useCallback(() => {
+    dispatch(clearLastActionCreator());
+  }, [dispatch]);
 
   return {
-    itinerary,
+    itinerary: activeItinerary,
     tripInput,
     fromStorage,
     isEdited,
@@ -318,3 +370,5 @@ export function useEditableItinerary(): EditableItineraryState {
     clearLastAction,
   };
 }
+
+

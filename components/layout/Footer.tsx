@@ -1,6 +1,12 @@
+"use client";
+
 import Link from "next/link";
+import { useAppSelector } from "@/store/hooks";
 
 export default function Footer() {
+  // The feedback dashboard is admin-only — hide its link from everyone else
+  const isAdmin = useAppSelector((s) => s.auth.user?.role === "admin");
+
   return (
     <footer className="border-t border-stone-100 bg-stone-50">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
@@ -23,9 +29,11 @@ export default function Footer() {
             <Link href="/plan" className="hover:text-teal-700 transition-colors">
               Plan a Trip
             </Link>
-            <Link href="/feedback" className="hover:text-teal-700 transition-colors">
-              Feedback
-            </Link>
+            {isAdmin && (
+              <Link href="/feedback" className="hover:text-teal-700 transition-colors">
+                Feedback
+              </Link>
+            )}
           </nav>
 
           {/* Disclaimer */}
