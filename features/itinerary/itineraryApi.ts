@@ -6,6 +6,7 @@
 import { baseApi } from "@/features/api/baseApi";
 import type { GeneratedItinerary, TripInput } from "@/types";
 import type { SaveItineraryResponse } from "@/features/api/apiTypes";
+import { toGenerateDTO } from "@/lib/mappers/toGenerateDTO";
 
 /** Backend Trip row shape (subset the frontend consumes). */
 export interface TripRecord {
@@ -27,7 +28,7 @@ export const itineraryApi = baseApi.injectEndpoints({
       query: (tripInput) => ({
         url: "/trips/generate",
         method: "POST",
-        body: tripInput,
+        body: toGenerateDTO(tripInput),
       }),
       invalidatesTags: ["Itinerary"],
     }),

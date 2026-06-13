@@ -16,6 +16,13 @@ import { baseApi } from "@/features/api/baseApi";
 import type { Destination, Place, PlaceInterest, TravelStyle } from "@/types";
 
 /**
+ * Lightweight destination string list returned by
+ * GET /api/v1/places/destinations.
+ * Each entry is the exact lowercase DB value (e.g. "ella", "nuwara-eliya").
+ */
+export type DestinationName = string;
+
+/**
  * Query parameters for searching places (optional).
  * Used by the search endpoint to filter results.
  */
@@ -29,13 +36,19 @@ export interface PlaceSearchParams {
 export const placesApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     /**
-     * Fetch all available destinations.
-     *
-     * Future implementation:
-     *   GET /api/destinations
-     *   response: Destination[]
-     *
-     * Currently not used (static data from data/destinations.ts).
+     * Live destination list from the DB.
+     * GET /api/v1/places/destinations → string[]
+     * Each string is the exact lowercase value stored in Place.destination.
+     */
+    getDestinationNames: builder.query<DestinationName[], void>({
+      query: () => "/places/destinations",
+      providesTags: ["Destination"],
+    }),
+
+    /**
+     * Full Destination objects (legacy — backed by static data/destinations.ts,
+     * not yet wired to a backend endpoint).
+     * TODO: add GET /api/v1/destinations returning Destination[] and wire here.
      */
     getDestinations: builder.query<Destination[], void>({
       query: () => "/destinations",
@@ -43,13 +56,7 @@ export const placesApi = baseApi.injectEndpoints({
     }),
 
     /**
-     * Fetch a single destination by ID.
-     *
-     * Future implementation:
-     *   GET /api/destinations/:id
-     *   response: Destination
-     *
-     * Currently not used.
+     * Fetch a single destination by ID (not yet backed by a backend endpoint).
      */
     getDestination: builder.query<Destination, string>({
       query: (id) => `/destinations/${id}`,
@@ -103,6 +110,7 @@ export const placesApi = baseApi.injectEndpoints({
 });
 
 export const {
+  useGetDestinationNamesQuery,
   useGetDestinationsQuery,
   useGetDestinationQuery,
   useSearchPlacesQuery,

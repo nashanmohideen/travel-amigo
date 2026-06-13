@@ -98,6 +98,7 @@ export function useEditableItinerary(): EditableItineraryState {
 
   // ── Redux selectors ──────────────────────────────────────────────────────
   const activeItinerary = useAppSelector((s) => s.itinerary.activeItinerary);
+  const itinerarySource = useAppSelector((s) => s.itinerary.source);
   const isEdited = useAppSelector((s) => s.itinerary.isEdited);
   const lastAction = useAppSelector((s) => s.itinerary.lastAction);
 
@@ -108,6 +109,13 @@ export function useEditableItinerary(): EditableItineraryState {
 
   // Guard: skip the persistence effect until after hydration is complete.
   const hydratedRef = useRef(false);
+
+  // Refs so performHydration reads current Redux values without adding them
+  // to the effect's dependency array (we only want the effect to run once).
+  const activeItineraryRef = useRef(activeItinerary);
+  activeItineraryRef.current = activeItinerary;
+  const itinerarySourceRef = useRef(itinerarySource);
+  itinerarySourceRef.current = itinerarySource;
 
   // ── Helper: Try API generation with fallback to local generator ──────────
   /**
@@ -141,6 +149,16 @@ export function useEditableItinerary(): EditableItineraryState {
     let isMounted = true;
 
     const performHydration = async () => {
+      // 0. If the form already generated and stored an itinerary in Redux
+      //    (source === "generated"), use it directly — skip re-fetch.
+      if (activeItineraryRef.current && itinerarySourceRef.current === "generated") {
+        if (isMounted) {
+          setFromStorage(true);
+          hydratedRef.current = true;
+        }
+        return;
+      }
+
       // 1. Try to load trip input from localStorage
       let input: TripInput | null = null;
       let gotStorage = false;
@@ -188,7 +206,7 @@ export function useEditableItinerary(): EditableItineraryState {
       // Fresh generation — use API first with local fallback
       if (!input) input = createDefaultTripInput();
       const { itinerary: fresh } = await generateWithApiFallback(input);
-      
+
       if (isMounted) {
         // Determine the source label: prioritize "generated" (API + gotStorage) or "fallback"
         const src = gotStorage ? "generated" : "fallback";

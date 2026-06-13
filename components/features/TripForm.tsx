@@ -7,49 +7,51 @@ import Button from "@/components/ui/Button";
 import SelectOption from "@/components/ui/SelectOption";
 import { cn, formatLKR } from "@/lib/utils";
 import type { TripInput, TravelStyle, TransportMode, TripPace } from "@/types";
-import { LS_TRIP_INPUT } from "@/lib/storageKeys";
+import { LS_TRIP_INPUT, LS_EDITED_ITINERARY } from "@/lib/storageKeys";
 import { useAppDispatch } from "@/store/hooks";
 import { setTripDraft } from "@/features/trips/tripDraftSlice";
+import { useGenerateItineraryMutation } from "@/features/itinerary/itineraryApi";
+import { setActiveItinerary } from "@/features/itinerary/itinerarySlice";
 
 // ── Static option data ────────────────────────────────────────────────────────
 
 const DESTINATIONS = [
-  { id: "ella", label: "Ella", emoji: "🍵", tag: "Hill country" },
-  { id: "kandy", label: "Kandy", emoji: "🛕", tag: "Cultural" },
-  { id: "galle", label: "Galle", emoji: "⚓", tag: "Coastal fort" },
-  { id: "nuwara-eliya", label: "Nuwara Eliya", emoji: "🌿", tag: "Tea country" },
-  { id: "colombo", label: "Colombo", emoji: "🏙️", tag: "City" },
+  { id: "ella",          label: "Ella",          emoji: "🍵", tag: "Hill country"  },
+  { id: "kandy",         label: "Kandy",         emoji: "🛕", tag: "Cultural"      },
+  { id: "galle",         label: "Galle",         emoji: "⚓", tag: "Coastal fort"  },
+  { id: "nuwara-eliya",  label: "Nuwara Eliya",  emoji: "🌿", tag: "Tea country"   },
+  { id: "colombo",       label: "Colombo",       emoji: "🏙️", tag: "City"          },
 ];
 
 const DURATIONS = [1, 2, 3, 4, 5] as const;
 
 const TRAVEL_STYLES: { value: TravelStyle; label: string; emoji: string; desc: string }[] = [
-  { value: "budget", label: "Budget", emoji: "🎒", desc: "Guesthouses, local eats, public transport" },
-  { value: "balanced", label: "Balanced", emoji: "🏨", desc: "Mix of comfort and value" },
-  { value: "premium", label: "Premium", emoji: "✨", desc: "Boutique stays, curated experiences" },
+  { value: "budget",   label: "Budget",   emoji: "🎒", desc: "Guesthouses, local eats, public transport" },
+  { value: "balanced", label: "Balanced", emoji: "🏨", desc: "Mix of comfort and value"                  },
+  { value: "premium",  label: "Premium",  emoji: "✨", desc: "Boutique stays, curated experiences"       },
 ];
 
 const INTERESTS = [
-  { value: "nature", label: "Nature", emoji: "🌿" },
-  { value: "culture", label: "Culture", emoji: "🛕" },
-  { value: "food", label: "Food", emoji: "🍛" },
-  { value: "adventure", label: "Adventure", emoji: "🧗" },
-  { value: "beaches", label: "Beaches", emoji: "🏖️" },
-  { value: "photography", label: "Photography", emoji: "📸" },
-  { value: "family", label: "Family-friendly", emoji: "👨‍👩‍👧" },
-  { value: "relaxation", label: "Relaxation", emoji: "🧘" },
+  { value: "nature",      label: "Nature",          emoji: "🌿" },
+  { value: "culture",     label: "Culture",         emoji: "🛕" },
+  { value: "food",        label: "Food",            emoji: "🍛" },
+  { value: "adventure",   label: "Adventure",       emoji: "🧗" },
+  { value: "beaches",     label: "Beaches",         emoji: "🏖️" },
+  { value: "photography", label: "Photography",     emoji: "📸" },
+  { value: "family",      label: "Family-friendly", emoji: "👨‍👩‍👧" },
+  { value: "relaxation",  label: "Relaxation",      emoji: "🧘" },
 ];
 
 const TRANSPORT_MODES: { value: TransportMode; label: string; emoji: string; desc: string }[] = [
-  { value: "public", label: "Public transport", emoji: "🚌", desc: "Buses & trains" },
-  { value: "private", label: "Private vehicle", emoji: "🚗", desc: "Hired car or van" },
-  { value: "mixed", label: "Mixed", emoji: "🔀", desc: "Best of both" },
+  { value: "public",  label: "Public transport", emoji: "🚌", desc: "Buses & trains"     },
+  { value: "private", label: "Private vehicle",  emoji: "🚗", desc: "Hired car or van"   },
+  { value: "mixed",   label: "Mixed",            emoji: "🔀", desc: "Best of both"       },
 ];
 
 const PACES: { value: TripPace; label: string; emoji: string; desc: string }[] = [
-  { value: "relaxed", label: "Relaxed", emoji: "😌", desc: "1–2 activities per day" },
-  { value: "balanced", label: "Balanced", emoji: "🙂", desc: "2–3 activities per day" },
-  { value: "packed", label: "Packed", emoji: "⚡", desc: "See as much as possible" },
+  { value: "relaxed",  label: "Relaxed",  emoji: "😌", desc: "1–2 activities per day"     },
+  { value: "balanced", label: "Balanced", emoji: "🙂", desc: "2–3 activities per day"     },
+  { value: "packed",   label: "Packed",   emoji: "⚡", desc: "See as much as possible"    },
 ];
 
 // ── Budget warning threshold (LKR per person per day) ─────────────────────────
@@ -57,14 +59,14 @@ const LOW_BUDGET_THRESHOLD = 3500;
 
 // ── Default form state ────────────────────────────────────────────────────────
 const DEFAULT_FORM: TripInput = {
-  destination: "",
-  duration: 3,
-  travelers: 2,
-  budgetLKR: 50000,
-  travelStyle: "balanced",
-  interests: [],
+  destination:   "",
+  duration:      3,
+  travelers:     2,
+  budgetLKR:     50000,
+  travelStyle:   "balanced",
+  interests:     [],
   transportMode: "mixed",
-  pace: "balanced",
+  pace:          "balanced",
 };
 
 // ── Errors type ───────────────────────────────────────────────────────────────
@@ -97,14 +99,14 @@ function SummaryPanel({
       : 0;
 
   const rows: { label: string; value: string }[] = [
-    { label: "Destination", value: dest ? `${dest.emoji} ${dest.label}` : "—" },
-    { label: "Duration", value: form.duration ? `${form.duration} day${form.duration > 1 ? "s" : ""}` : "—" },
-    { label: "Travellers", value: form.travelers ? `${form.travelers} ${form.travelers === 1 ? "person" : "people"}` : "—" },
-    { label: "Budget", value: form.budgetLKR ? formatLKR(form.budgetLKR) : "—" },
-    { label: "Per person/day", value: perPersonPerDay > 0 ? formatLKR(Math.round(perPersonPerDay)) : "—" },
-    { label: "Style", value: TRAVEL_STYLES.find((s) => s.value === form.travelStyle)?.label ?? "—" },
-    { label: "Transport", value: TRANSPORT_MODES.find((t) => t.value === form.transportMode)?.label ?? "—" },
-    { label: "Pace", value: PACES.find((p) => p.value === form.pace)?.label ?? "—" },
+    { label: "Destination",   value: dest ? `${dest.emoji} ${dest.label}` : "—" },
+    { label: "Duration",      value: form.duration ? `${form.duration} day${form.duration > 1 ? "s" : ""}` : "—" },
+    { label: "Travellers",    value: form.travelers ? `${form.travelers} ${form.travelers === 1 ? "person" : "people"}` : "—" },
+    { label: "Budget",        value: form.budgetLKR ? formatLKR(form.budgetLKR) : "—" },
+    { label: "Per person/day",value: perPersonPerDay > 0 ? formatLKR(Math.round(perPersonPerDay)) : "—" },
+    { label: "Style",         value: TRAVEL_STYLES.find((s) => s.value === form.travelStyle)?.label ?? "—" },
+    { label: "Transport",     value: TRANSPORT_MODES.find((t) => t.value === form.transportMode)?.label ?? "—" },
+    { label: "Pace",          value: PACES.find((p) => p.value === form.pace)?.label ?? "—" },
   ];
 
   const selectedInterests = INTERESTS.filter((i) => form.interests.includes(i.value));
@@ -141,7 +143,6 @@ function SummaryPanel({
         </div>
       )}
 
-      {/* Budget warning */}
       {budgetWarning && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 flex gap-2">
           <span className="text-amber-500 text-base shrink-0">⚠️</span>
@@ -149,7 +150,6 @@ function SummaryPanel({
         </div>
       )}
 
-      {/* Readiness indicator */}
       {!budgetWarning && form.destination && form.interests.length > 0 && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 flex gap-2 items-center">
           <span className="text-emerald-500 text-base shrink-0">✅</span>
@@ -167,8 +167,10 @@ export default function TripForm() {
   const [form, setForm] = useState<TripInput>(DEFAULT_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Derive budget warning without storing it in state
+  const [generateItinerary] = useGenerateItineraryMutation();
+
   const budgetPerPersonPerDay =
     form.travelers > 0 && form.duration > 0
       ? form.budgetLKR / (form.travelers * form.duration)
@@ -180,7 +182,6 @@ export default function TripForm() {
 
   function set<K extends keyof TripInput>(key: K, value: TripInput[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
-    // Clear error on change
     if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }));
   }
 
@@ -208,28 +209,33 @@ export default function TripForm() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setErrorMsg(null);
+
     const errs = validate();
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
-      // Scroll to first error
-      const firstErrorEl = document.querySelector("[data-error]");
-      firstErrorEl?.scrollIntoView({ behavior: "smooth", block: "center" });
+      document.querySelector("[data-error]")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
     setLoading(true);
-    // Save to localStorage so itinerary page can read user's choices
-    try {
-      localStorage.setItem(LS_TRIP_INPUT, JSON.stringify(form));
-    } catch {
-      // localStorage may be unavailable (private browsing, etc.) — not fatal
-    }
-    // Mirror into Redux so any component can read the current trip draft
+
+    // Persist form input to localStorage for the demo page's fallback reader.
+    try { localStorage.setItem(LS_TRIP_INPUT, JSON.stringify(form)); } catch {}
+    // Clear any stale edited itinerary so the demo page always shows fresh results.
+    try { localStorage.removeItem(LS_EDITED_ITINERARY); } catch {}
+
     dispatch(setTripDraft(form));
 
-    // Simulate generation delay
-    await new Promise((r) => setTimeout(r, 1600));
-    router.push("/itinerary/demo");
+    try {
+      // Call the generate API directly — result goes straight into Redux.
+      const itinerary = await generateItinerary(form).unwrap();
+      dispatch(setActiveItinerary({ itinerary, source: "generated" }));
+      router.push("/itinerary/demo");
+    } catch {
+      setErrorMsg("Generation failed — please check your connection and try again.");
+      setLoading(false);
+    }
   }
 
   return (
@@ -349,7 +355,6 @@ export default function TripForm() {
                 {errors.budgetLKR}
               </p>
             )}
-            {/* Inline budget warning (mobile — shown inline; desktop shows in sidebar) */}
             {budgetWarning && (
               <div className="lg:hidden mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 flex gap-2">
                 <span className="text-amber-500 shrink-0">⚠️</span>
@@ -450,6 +455,13 @@ export default function TripForm() {
             </div>
           </Card>
 
+          {/* Error message */}
+          {errorMsg && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {errorMsg}
+            </div>
+          )}
+
           {/* Submit */}
           <Button
             type="submit"
@@ -459,7 +471,7 @@ export default function TripForm() {
             fullWidth
             className="mt-1"
           >
-            {loading ? "Crafting your itinerary…" : "Generate My Itinerary ✨"}
+            {loading ? "Generating your itinerary…" : "Generate My Itinerary ✨"}
           </Button>
 
           {/* Mobile: summary below form */}
