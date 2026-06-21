@@ -78,8 +78,8 @@ export default function GeneratedBudgetSummary({
     <Card className="flex flex-col gap-5">
       {/* Header */}
       <div>
-        <h3 className="text-lg font-bold text-stone-900">Estimated Budget</h3>
-        <p className="text-xs text-stone-400 mt-0.5">
+        <h3 className="font-display text-xl font-bold text-stone-900">Estimated Budget</h3>
+        <p className="text-xs text-stone-400 mt-0.5 leading-relaxed">
           All costs in LKR · {travelers}{" "}
           {travelers === 1 ? "traveller" : "travellers"} · {duration}{" "}
           {duration === 1 ? "night" : "nights"}
@@ -87,12 +87,20 @@ export default function GeneratedBudgetSummary({
       </div>
 
       {/* Total highlight card */}
-      <div className="rounded-2xl bg-gradient-to-br from-teal-600 to-teal-800 p-5 text-white">
-        <p className="text-xs opacity-75 uppercase tracking-wide">Total estimated cost</p>
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-700 to-teal-900 p-5 text-white shadow-md shadow-teal-900/20">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage:
+              "radial-gradient(ellipse at 80% 120%, rgba(251,191,36,0.15) 0%, transparent 55%)",
+          }}
+        />
+        <p className="text-xs text-white/65 uppercase tracking-widest font-semibold">Total estimated cost</p>
         <p className="text-3xl font-bold mt-1 tabular-nums">{formatLKR(budget.total)}</p>
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm opacity-90">
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-white/80">
           <span>{formatLKR(budget.perPerson)} /person</span>
-          <span className="opacity-40">·</span>
+          <span className="text-white/30">·</span>
           <span>{formatLKR(Math.round(budget.total / Math.max(duration, 1)))}/day</span>
         </div>
       </div>

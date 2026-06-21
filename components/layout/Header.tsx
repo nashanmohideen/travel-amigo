@@ -16,7 +16,7 @@ const navLinks = [
 
 const linkClass = (active: boolean) =>
   cn(
-    "text-sm font-medium transition-colors hover:text-teal-700",
+    "text-sm font-medium transition-colors duration-150 hover:text-teal-700",
     active ? "text-teal-700" : "text-stone-500",
   );
 
@@ -30,7 +30,6 @@ export default function Header() {
 
   async function handleSignOut() {
     try {
-      // Revoke the refresh token server-side; local cleanup happens regardless
       await logoutRequest().unwrap();
     } catch {
       /* token may already be invalid — still sign out locally */
@@ -41,18 +40,18 @@ export default function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-stone-100 bg-white/90 backdrop-blur-sm">
+    <header className="sticky top-0 z-50 w-full border-b border-stone-100/80 bg-white/92 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 group">
-          <span className="text-2xl">✈️</span>
-          <span className="text-lg font-bold tracking-tight text-stone-900 group-hover:text-teal-700 transition-colors">
+          <span className="text-2xl transition-transform duration-300 group-hover:rotate-12">✈️</span>
+          <span className="text-lg font-bold tracking-tight text-stone-900 group-hover:text-teal-700 transition-colors duration-150">
             Travel<span className="text-teal-700">Amigo</span>
           </span>
         </Link>
 
         {/* Nav links (desktop) */}
-        <nav className="hidden sm:flex items-center gap-6">
+        <nav className="hidden sm:flex items-center gap-7">
           {navLinks.map((link) => (
             <Link
               key={link.href}
@@ -78,7 +77,7 @@ export default function Header() {
         </nav>
 
         {/* Auth state + CTA */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {status === "authenticated" && user ? (
             <>
               <span
@@ -109,7 +108,7 @@ export default function Header() {
             )
           )}
           <Link href="/plan">
-            <Button size="sm" variant="primary">
+            <Button size="sm" variant="primary" className="shadow-sm">
               Plan My Trip
             </Button>
           </Link>

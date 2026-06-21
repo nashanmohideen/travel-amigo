@@ -2,20 +2,21 @@
 
 @theme inline {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-playfair), Georgia, "Times New Roman", serif;
 }
 
-/* Smooth scrolling */
+/* ── Smooth scrolling ──────────────────────────────────────────────────────── */
 html {
   scroll-behavior: smooth;
 }
 
-/* Better default focus ring using teal brand colour */
+/* ── Focus ring: teal glow ────────────────────────────────────────────────── */
 :focus-visible {
   outline: 2px solid theme(--color-teal-500);
   outline-offset: 2px;
 }
 
-/* Minimal scrollbar on webkit */
+/* ── Subtle scrollbar ─────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -27,9 +28,67 @@ html {
   border-radius: 9999px;
 }
 
-/* ── Print styles ────────────────────────────────────────────── */
+/* ── Display font utility ─────────────────────────────────────────────────── */
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* ── Gradient text utility ────────────────────────────────────────────────── */
+.text-gradient-brand {
+  background: linear-gradient(135deg, #f59e0b 0%, #f97316 50%, #fbbf24 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Animate-in utilities ─────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+.animate-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+.slide-in-from-bottom-2 {
+  animation: slideUp 0.25s ease-out forwards;
+}
+.fade-in {
+  animation: fadeIn 0.15s ease-out forwards;
+}
+
+/* ── Loading dots ─────────────────────────────────────────────────────────── */
+@keyframes pulse {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40%            { transform: scale(1.0); opacity: 1.0; }
+}
+
+/* ── Skeleton loader ──────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position:  200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #f3f4f6 25%, #e9eaeb 50%, #f3f4f6 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+
+/* ── Glass surface ────────────────────────────────────────────────────────── */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ── ════════════════════════════════════════════════════════════════════════
+   PRINT STYLES — preserve all existing print functionality
+   ════════════════════════════════════════════════════════════════════════ */
 @media print {
-  /* Hide everything not meant for printing */
   .no-print,
   nav,
   footer,
@@ -37,21 +96,18 @@ html {
     display: none !important;
   }
 
-  /* Reset backgrounds for ink saving */
   body {
     background: white !important;
     color: black !important;
     font-size: 11pt;
   }
 
-  /* Keep page within print area */
   .print-main {
     max-width: 100% !important;
     padding: 0 !important;
     margin: 0 !important;
   }
 
-  /* Teal hero gradient → flat teal block */
   .print-hero {
     background: #0f766e !important;
     color: white !important;
@@ -61,41 +117,34 @@ html {
     border-radius: 0 !important;
   }
 
-  /* Cards: remove shadows, keep borders */
   .print-card {
     box-shadow: none !important;
     border: 1pt solid #e7e5e4 !important;
     break-inside: avoid;
   }
 
-  /* Force backgrounds to print (Tailwind bg-* classes) */
   * {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  /* Avoid splitting day cards across pages */
   .print-avoid-break {
     page-break-inside: avoid;
     break-inside: avoid;
   }
 
-  /* Budget summary should print correctly */
   .print-budget {
     display: block !important;
   }
 
-  /* Two-column layout collapses to single column for print */
   .lg\:grid-cols-\[1fr_320px\] {
     display: block !important;
   }
 
-  /* Sidebar items hidden in print (map placeholder, action panel) */
   .lg\:hidden {
     display: block !important;
   }
 
-  /* Print disclaimer */
   .print-disclaimer {
     display: block !important;
     font-size: 8pt;
@@ -103,5 +152,10 @@ html {
     margin-top: 16pt;
     border-top: 1pt solid #e7e5e4;
     padding-top: 8pt;
+  }
+
+  /* Hide the gradient text fill in print — let it show as plain dark text */
+  .font-display {
+    -webkit-text-fill-color: inherit !important;
   }
 }
