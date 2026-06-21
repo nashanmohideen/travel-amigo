@@ -65,17 +65,19 @@ function EmptyState() {
   return (
     <div className="min-h-screen bg-stone-50 flex items-center justify-center px-4">
       <div className="text-center max-w-sm">
-        <div className="text-5xl mb-4">🔗</div>
-        <h1 className="text-xl font-bold text-stone-800 mb-2">
-          Shared itinerary not available
+        <div className="mx-auto mb-6 h-20 w-20 rounded-full bg-stone-100 flex items-center justify-center">
+          <span className="text-4xl">🔗</span>
+        </div>
+        <h1 className="font-display text-2xl font-bold text-stone-800 mb-2">
+          Itinerary not available
         </h1>
-        <p className="text-sm text-stone-500 mb-6">
-          This shared itinerary is not available. It may have been cleared or
-          the link is expired.
+        <p className="text-sm text-stone-500 mb-8 leading-relaxed">
+          This shared itinerary could not be found. The link may have expired or
+          the itinerary was removed.
         </p>
         <Link
           href="/plan"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-700 px-6 py-3 text-sm font-semibold text-white hover:bg-teal-800 transition-colors"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-700 px-6 py-3 text-sm font-semibold text-white hover:bg-teal-800 hover:shadow-md transition-all duration-200"
         >
           Create your own trip →
         </Link>
@@ -110,10 +112,12 @@ export default function SharedItineraryView({ token = "demo" }: Props) {
 
   if (itinerary === "loading") {
     return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-3">✈️</div>
-          <p className="text-stone-500">Loading shared itinerary…</p>
+      <div className="min-h-[60vh] flex items-center justify-center bg-stone-50">
+        <div className="text-center px-4">
+          <div className="mx-auto mb-5 h-14 w-14 rounded-full bg-gradient-to-br from-teal-600 to-emerald-700 flex items-center justify-center shadow-lg shadow-teal-900/20">
+            <span className="text-2xl">✈️</span>
+          </div>
+          <p className="text-sm text-stone-500 font-medium">Loading shared itinerary…</p>
         </div>
       </div>
     );
@@ -132,29 +136,37 @@ export default function SharedItineraryView({ token = "demo" }: Props) {
   return (
     <div className="min-h-screen bg-stone-50">
       {/* ── Shared banner ── */}
-      <div className="bg-teal-50 border-b border-teal-200 px-4 py-3 text-center">
-        <p className="text-sm text-teal-800">
+      <div className="bg-teal-50 border-b border-teal-100 px-4 py-3 text-center">
+        <p className="text-sm text-teal-800 font-medium">
           <span className="font-semibold">Shared Travel Amigo itinerary</span>
           {" — "}
-          <Link href="/plan" className="underline font-medium hover:text-teal-900">
+          <Link href="/plan" className="underline font-semibold hover:text-teal-900 transition-colors">
             Create your own trip →
           </Link>
         </p>
       </div>
 
       {/* ── Hero header ── */}
-      <div className="print-hero bg-gradient-to-br from-teal-700 to-teal-900 text-white">
-        <div className="mx-auto max-w-6xl px-4 py-10">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-2xl">🇱🇰</span>
-            <span className="text-sm font-medium uppercase tracking-wider opacity-70">
+      <div className="print-hero relative overflow-hidden bg-gradient-to-br from-teal-900 via-teal-800 to-emerald-800 text-white">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage:
+              "radial-gradient(ellipse at 80% 110%, rgba(251,191,36,0.10) 0%, transparent 55%)",
+          }}
+        />
+        <div className="relative mx-auto max-w-6xl px-4 py-12 sm:py-14">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xl">🇱🇰</span>
+            <span className="text-xs font-semibold uppercase tracking-widest text-white/60">
               {tripInput.destination} · Sri Lanka
             </span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold leading-tight">
+          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight max-w-2xl">
             {itinerary.title}
           </h1>
-          <p className="mt-2 text-sm opacity-70">
+          <p className="mt-2.5 text-sm text-white/65 font-medium">
             {tripInput.duration}{" "}
             {tripInput.duration === 1 ? "night" : "nights"} ·{" "}
             {tripInput.travelers}{" "}
@@ -165,7 +177,7 @@ export default function SharedItineraryView({ token = "demo" }: Props) {
             {[transportLabel, paceLabel, `📅 ${formatDisplayDate(itinerary.generatedAt)}`].map((chip) => (
               <span
                 key={chip}
-                className="text-xs bg-white/15 rounded-full px-3 py-1 backdrop-blur-sm"
+                className="text-xs bg-white/12 border border-white/10 rounded-full px-3 py-1 backdrop-blur-sm font-medium"
               >
                 {chip}
               </span>
@@ -228,17 +240,22 @@ export default function SharedItineraryView({ token = "demo" }: Props) {
 
             {/* Tips */}
             {tips.length > 0 && (
-              <Card className="bg-teal-50 border border-teal-100">
-                <h3 className="text-sm font-bold text-teal-900 mb-3">
-                  💡 Local tips for{" "}
-                  {tripInput.destination.charAt(0).toUpperCase() +
-                    tripInput.destination.slice(1)}
-                </h3>
-                <ul className="flex flex-col gap-2">
+              <Card className="bg-gradient-to-br from-teal-50 to-emerald-50 border border-teal-100 shadow-sm">
+                <div className="flex items-center gap-2.5 mb-4">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-600 text-white shadow-sm">
+                    <span className="text-sm">💡</span>
+                  </div>
+                  <h3 className="font-display font-bold text-teal-900 text-base">
+                    Local tips for{" "}
+                    {tripInput.destination.charAt(0).toUpperCase() +
+                      tripInput.destination.slice(1)}
+                  </h3>
+                </div>
+                <ul className="flex flex-col gap-3">
                   {tips.map((tip, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-teal-800">
-                      <span className="shrink-0 mt-0.5">•</span>
-                      <span>{tip}</span>
+                    <li key={i} className="flex items-start gap-3 text-sm text-teal-800">
+                      <span className="shrink-0 mt-1 h-1.5 w-1.5 rounded-full bg-teal-500" />
+                      <span className="leading-relaxed">{tip}</span>
                     </li>
                   ))}
                 </ul>
@@ -268,21 +285,31 @@ export default function SharedItineraryView({ token = "demo" }: Props) {
             <MapPlaceholder itinerary={itinerary} />
 
             {/* CTA */}
-            <Card className="text-center flex flex-col items-center gap-3 py-6">
-              <div className="text-3xl">🇱🇰</div>
-              <p className="text-sm font-bold text-stone-800">
-                Inspired by this itinerary?
-              </p>
-              <p className="text-xs text-stone-500">
-                Create your personalised Sri Lanka trip for free.
-              </p>
-              <Link
-                href="/plan"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 transition-colors"
-              >
-                Plan your own trip →
-              </Link>
-            </Card>
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-800 to-emerald-800 text-white text-center flex flex-col items-center gap-3 p-7 shadow-lg">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  backgroundImage:
+                    "radial-gradient(ellipse at 50% 120%, rgba(251,191,36,0.12) 0%, transparent 55%)",
+                }}
+              />
+              <div className="relative">
+                <div className="text-3xl mb-3">🇱🇰</div>
+                <p className="font-display font-bold text-white text-lg leading-tight mb-1">
+                  Inspired by this trip?
+                </p>
+                <p className="text-xs text-white/65 mb-4 leading-relaxed max-w-[180px] mx-auto">
+                  Create your personalised Sri Lanka itinerary for free.
+                </p>
+                <Link
+                  href="/plan"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-600 hover:shadow-lg transition-all duration-200 shadow-md shadow-amber-900/25"
+                >
+                  Plan your own trip →
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </div>

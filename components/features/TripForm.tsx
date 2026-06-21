@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -54,10 +54,8 @@ const PACES: { value: TripPace; label: string; emoji: string; desc: string }[] =
   { value: "packed",   label: "Packed",   emoji: "⚡", desc: "See as much as possible"    },
 ];
 
-// ── Budget warning threshold (LKR per person per day) ─────────────────────────
 const LOW_BUDGET_THRESHOLD = 3500;
 
-// ── Default form state ────────────────────────────────────────────────────────
 const DEFAULT_FORM: TripInput = {
   destination:   "",
   duration:      3,
@@ -69,14 +67,13 @@ const DEFAULT_FORM: TripInput = {
   pace:          "balanced",
 };
 
-// ── Errors type ───────────────────────────────────────────────────────────────
 type FormErrors = Partial<Record<keyof TripInput, string>>;
 
-// ── Section heading sub-component ─────────────────────────────────────────────
+// ── Section heading ───────────────────────────────────────────────────────────
 function SectionLabel({ step, children }: { step: number; children: string }) {
   return (
-    <div className="flex items-center gap-3 mb-4">
-      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-700 text-xs font-bold text-white shrink-0">
+    <div className="flex items-center gap-3 mb-5">
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-teal-700 text-xs font-bold text-white shrink-0 shadow-sm shadow-teal-900/20">
         {step}
       </span>
       <h2 className="text-base font-semibold text-stone-900">{children}</h2>
@@ -99,28 +96,28 @@ function SummaryPanel({
       : 0;
 
   const rows: { label: string; value: string }[] = [
-    { label: "Destination",   value: dest ? `${dest.emoji} ${dest.label}` : "—" },
-    { label: "Duration",      value: form.duration ? `${form.duration} day${form.duration > 1 ? "s" : ""}` : "—" },
-    { label: "Travellers",    value: form.travelers ? `${form.travelers} ${form.travelers === 1 ? "person" : "people"}` : "—" },
-    { label: "Budget",        value: form.budgetLKR ? formatLKR(form.budgetLKR) : "—" },
-    { label: "Per person/day",value: perPersonPerDay > 0 ? formatLKR(Math.round(perPersonPerDay)) : "—" },
-    { label: "Style",         value: TRAVEL_STYLES.find((s) => s.value === form.travelStyle)?.label ?? "—" },
-    { label: "Transport",     value: TRANSPORT_MODES.find((t) => t.value === form.transportMode)?.label ?? "—" },
-    { label: "Pace",          value: PACES.find((p) => p.value === form.pace)?.label ?? "—" },
+    { label: "Destination",    value: dest ? `${dest.emoji} ${dest.label}` : "—" },
+    { label: "Duration",       value: form.duration ? `${form.duration} day${form.duration > 1 ? "s" : ""}` : "—" },
+    { label: "Travellers",     value: form.travelers ? `${form.travelers} ${form.travelers === 1 ? "person" : "people"}` : "—" },
+    { label: "Budget",         value: form.budgetLKR ? formatLKR(form.budgetLKR) : "—" },
+    { label: "Per person/day", value: perPersonPerDay > 0 ? formatLKR(Math.round(perPersonPerDay)) : "—" },
+    { label: "Style",          value: TRAVEL_STYLES.find((s) => s.value === form.travelStyle)?.label ?? "—" },
+    { label: "Transport",      value: TRANSPORT_MODES.find((t) => t.value === form.transportMode)?.label ?? "—" },
+    { label: "Pace",           value: PACES.find((p) => p.value === form.pace)?.label ?? "—" },
   ];
 
   const selectedInterests = INTERESTS.filter((i) => form.interests.includes(i.value));
 
   return (
-    <Card className="flex flex-col gap-4">
+    <Card className="flex flex-col gap-5 border-stone-150 shadow-md shadow-stone-900/5">
       <div>
         <h3 className="font-bold text-stone-900">Trip summary</h3>
-        <p className="text-xs text-stone-400 mt-0.5">Updates as you fill the form</p>
+        <p className="text-xs text-stone-400 mt-0.5 leading-relaxed">Updates as you fill the form</p>
       </div>
 
-      <dl className="flex flex-col gap-2.5">
+      <dl className="flex flex-col gap-3">
         {rows.map(({ label, value }) => (
-          <div key={label} className="flex items-start justify-between gap-2">
+          <div key={label} className="flex items-start justify-between gap-3">
             <dt className="text-xs text-stone-500 shrink-0">{label}</dt>
             <dd className="text-xs font-semibold text-stone-800 text-right">{value}</dd>
           </div>
@@ -129,12 +126,12 @@ function SummaryPanel({
 
       {selectedInterests.length > 0 && (
         <div>
-          <p className="text-xs text-stone-500 mb-1.5">Interests</p>
-          <div className="flex flex-wrap gap-1">
+          <p className="text-xs text-stone-500 mb-2">Interests</p>
+          <div className="flex flex-wrap gap-1.5">
             {selectedInterests.map((i) => (
               <span
                 key={i.value}
-                className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700"
+                className="inline-flex items-center gap-1 rounded-full bg-teal-50 border border-teal-100 px-2.5 py-0.5 text-xs font-medium text-teal-700"
               >
                 {i.emoji} {i.label}
               </span>
@@ -144,16 +141,16 @@ function SummaryPanel({
       )}
 
       {budgetWarning && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 flex gap-2">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 flex gap-2.5">
           <span className="text-amber-500 text-base shrink-0">⚠️</span>
           <p className="text-xs text-amber-700 leading-relaxed">{budgetWarning}</p>
         </div>
       )}
 
       {!budgetWarning && form.destination && form.interests.length > 0 && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 flex gap-2 items-center">
-          <span className="text-emerald-500 text-base shrink-0">✅</span>
-          <p className="text-xs text-emerald-700 font-medium">Looks good! Ready to generate.</p>
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 flex gap-2.5 items-center">
+          <span className="text-emerald-500 text-base shrink-0">✓</span>
+          <p className="text-xs text-emerald-700 font-semibold">Looks good! Ready to generate.</p>
         </div>
       )}
     </Card>
@@ -207,7 +204,7 @@ export default function TripForm() {
     return errs;
   }
 
-  async function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     setErrorMsg(null);
 
@@ -220,15 +217,12 @@ export default function TripForm() {
 
     setLoading(true);
 
-    // Persist form input to localStorage for the demo page's fallback reader.
     try { localStorage.setItem(LS_TRIP_INPUT, JSON.stringify(form)); } catch {}
-    // Clear any stale edited itinerary so the demo page always shows fresh results.
     try { localStorage.removeItem(LS_EDITED_ITINERARY); } catch {}
 
     dispatch(setTripDraft(form));
 
     try {
-      // Call the generate API directly — result goes straight into Redux.
       const itinerary = await generateItinerary(form).unwrap();
       dispatch(setActiveItinerary({ itinerary, source: "generated" }));
       router.push("/itinerary/demo");
@@ -242,11 +236,11 @@ export default function TripForm() {
     <form onSubmit={handleSubmit} noValidate>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-        {/* ── Form fields (2 columns on desktop) ─────────────────────── */}
+        {/* ── Form fields (2 columns on desktop) ───────────────────────── */}
         <div className="lg:col-span-2 flex flex-col gap-5">
 
           {/* 1. Destination */}
-          <Card data-error={errors.destination ? "true" : undefined}>
+          <Card data-error={errors.destination ? "true" : undefined} className={errors.destination ? "border-red-200" : ""}>
             <SectionLabel step={1}>Where are you going?</SectionLabel>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {DESTINATIONS.map((dest) => (
@@ -263,7 +257,7 @@ export default function TripForm() {
               ))}
             </div>
             {errors.destination && (
-              <p className="mt-3 text-xs text-red-500" role="alert">
+              <p className="mt-3 text-xs text-red-500 font-medium" role="alert">
                 {errors.destination}
               </p>
             )}
@@ -279,11 +273,12 @@ export default function TripForm() {
                   type="button"
                   onClick={() => set("duration", d)}
                   className={cn(
-                    "flex items-center justify-center rounded-xl border-2 px-5 py-3 text-sm font-semibold transition-all duration-150",
+                    "flex items-center justify-center rounded-xl border-2 px-5 py-3 text-sm font-semibold transition-all duration-200",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2",
+                    "hover:shadow-sm active:scale-[0.97]",
                     form.duration === d
-                      ? "border-teal-600 bg-teal-600 text-white"
-                      : "border-stone-200 bg-white text-stone-700 hover:border-stone-300",
+                      ? "border-teal-600 bg-teal-600 text-white shadow-sm shadow-teal-900/20"
+                      : "border-stone-200 bg-white text-stone-700 hover:border-teal-300 hover:text-teal-700",
                   )}
                 >
                   {d} {d === 1 ? "day" : "days"}
@@ -293,14 +288,14 @@ export default function TripForm() {
           </Card>
 
           {/* 3. Traveller count */}
-          <Card data-error={errors.travelers ? "true" : undefined}>
+          <Card data-error={errors.travelers ? "true" : undefined} className={errors.travelers ? "border-red-200" : ""}>
             <SectionLabel step={3}>How many travellers?</SectionLabel>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-5">
               <button
                 type="button"
                 aria-label="Decrease travellers"
                 onClick={() => set("travelers", Math.max(1, form.travelers - 1))}
-                className="h-11 w-11 rounded-full border-2 border-stone-200 text-stone-600 text-xl font-bold hover:bg-stone-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+                className="h-11 w-11 rounded-full border-2 border-stone-200 text-stone-600 text-xl font-bold hover:bg-stone-50 hover:border-teal-300 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 active:scale-[0.93]"
               >
                 −
               </button>
@@ -311,7 +306,7 @@ export default function TripForm() {
                 type="button"
                 aria-label="Increase travellers"
                 onClick={() => set("travelers", Math.min(12, form.travelers + 1))}
-                className="h-11 w-11 rounded-full border-2 border-stone-200 text-stone-600 text-xl font-bold hover:bg-stone-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+                className="h-11 w-11 rounded-full border-2 border-stone-200 text-stone-600 text-xl font-bold hover:bg-stone-50 hover:border-teal-300 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 active:scale-[0.93]"
               >
                 +
               </button>
@@ -320,17 +315,17 @@ export default function TripForm() {
               </span>
             </div>
             {errors.travelers && (
-              <p className="mt-2 text-xs text-red-500" role="alert">
+              <p className="mt-2 text-xs text-red-500 font-medium" role="alert">
                 {errors.travelers}
               </p>
             )}
           </Card>
 
           {/* 4. Budget */}
-          <Card data-error={errors.budgetLKR ? "true" : undefined}>
+          <Card data-error={errors.budgetLKR ? "true" : undefined} className={errors.budgetLKR ? "border-red-200" : ""}>
             <SectionLabel step={4}>Total budget (LKR)</SectionLabel>
             <div className="relative">
-              <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-stone-400 text-sm font-medium">
+              <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-stone-400 text-sm font-semibold">
                 LKR
               </span>
               <input
@@ -341,27 +336,28 @@ export default function TripForm() {
                 placeholder="50000"
                 onChange={(e) => set("budgetLKR", Number(e.target.value))}
                 className={cn(
-                  "w-full rounded-xl border py-3 pl-14 pr-4 text-stone-900 text-base",
-                  "placeholder-stone-400 transition-colors duration-150",
-                  "focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent",
+                  "w-full rounded-xl border py-3 pl-14 pr-4 text-stone-900 text-base bg-white",
+                  "placeholder-stone-400 transition-all duration-200",
+                  "hover:border-stone-300",
+                  "focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500",
                   errors.budgetLKR
-                    ? "border-red-400 focus:ring-red-400"
+                    ? "border-red-400 focus:ring-red-400/40"
                     : "border-stone-200",
                 )}
               />
             </div>
             {errors.budgetLKR && (
-              <p className="mt-1.5 text-xs text-red-500" role="alert">
+              <p className="mt-1.5 text-xs text-red-500 font-medium" role="alert">
                 {errors.budgetLKR}
               </p>
             )}
             {budgetWarning && (
-              <div className="lg:hidden mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 flex gap-2">
+              <div className="lg:hidden mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 flex gap-2.5">
                 <span className="text-amber-500 shrink-0">⚠️</span>
                 <p className="text-xs text-amber-700 leading-relaxed">{budgetWarning}</p>
               </div>
             )}
-            <p className="mt-2 text-xs text-stone-400">
+            <p className="mt-2.5 text-xs text-stone-400 leading-relaxed">
               This is the total for all travellers for the entire trip.
             </p>
           </Card>
@@ -386,9 +382,9 @@ export default function TripForm() {
           </Card>
 
           {/* 6. Interests */}
-          <Card data-error={errors.interests ? "true" : undefined}>
+          <Card data-error={errors.interests ? "true" : undefined} className={errors.interests ? "border-red-200" : ""}>
             <SectionLabel step={6}>What are you interested in?</SectionLabel>
-            <p className="text-xs text-stone-400 -mt-2 mb-4">Select all that apply</p>
+            <p className="text-xs text-stone-400 -mt-3 mb-4 leading-relaxed">Select all that apply</p>
             <div className="flex flex-wrap gap-2">
               {INTERESTS.map((interest) => {
                 const selected = form.interests.includes(interest.value);
@@ -398,11 +394,12 @@ export default function TripForm() {
                     type="button"
                     onClick={() => toggleInterest(interest.value)}
                     className={cn(
-                      "inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition-all duration-150",
+                      "inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition-all duration-200",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-1",
+                      "active:scale-[0.96]",
                       selected
-                        ? "border-teal-600 bg-teal-600 text-white"
-                        : "border-stone-200 bg-white text-stone-600 hover:border-teal-300 hover:text-teal-700",
+                        ? "border-teal-600 bg-teal-600 text-white shadow-sm shadow-teal-900/15"
+                        : "border-stone-200 bg-white text-stone-600 hover:border-teal-300 hover:text-teal-700 hover:bg-teal-50/50",
                     )}
                   >
                     {interest.emoji} {interest.label}
@@ -411,7 +408,7 @@ export default function TripForm() {
               })}
             </div>
             {errors.interests && (
-              <p className="mt-3 text-xs text-red-500" role="alert">
+              <p className="mt-3 text-xs text-red-500 font-medium" role="alert">
                 {errors.interests}
               </p>
             )}
@@ -457,7 +454,7 @@ export default function TripForm() {
 
           {/* Error message */}
           {errorMsg && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3.5 text-sm text-red-700 font-medium">
               {errorMsg}
             </div>
           )}
@@ -469,7 +466,7 @@ export default function TripForm() {
             size="lg"
             loading={loading}
             fullWidth
-            className="mt-1"
+            className="mt-1 shadow-lg shadow-amber-900/20"
           >
             {loading ? "Generating your itinerary…" : "Generate My Itinerary ✨"}
           </Button>
@@ -480,9 +477,9 @@ export default function TripForm() {
           </div>
         </div>
 
-        {/* ── Summary panel (desktop only, sticky) ─────────────────── */}
+        {/* ── Summary panel (desktop only, sticky) ──────────────────── */}
         <div className="hidden lg:block">
-          <div className="sticky top-20">
+          <div className="sticky top-24">
             <SummaryPanel form={form} budgetWarning={budgetWarning} />
           </div>
         </div>

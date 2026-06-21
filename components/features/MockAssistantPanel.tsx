@@ -198,19 +198,28 @@ export default function MockAssistantPanel({
       : "";
 
   return (
-    <div className="no-print rounded-2xl border border-stone-200 bg-white overflow-hidden">
+    <div className="no-print rounded-2xl border border-stone-200 bg-white overflow-hidden shadow-sm">
       {/* ── Header / toggle ── */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-stone-50 transition-colors text-left"
+        className="w-full flex items-center justify-between px-4 py-4 hover:bg-stone-50/70 transition-colors text-left"
         aria-expanded={open}
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-sm font-bold text-stone-900 truncate">
-            Travel Amigo Assistant
-          </span>
-          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-700 rounded-full px-2 py-0.5">
+        <div className="flex items-center gap-3 min-w-0">
+          {/* Guide icon */}
+          <div className="shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-teal-600 to-emerald-700 flex items-center justify-center shadow-sm shadow-teal-900/20">
+            <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white" aria-hidden>
+              <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <span className="text-sm font-bold text-stone-900 truncate block">
+              Travel Amigo Assistant
+            </span>
+            <span className="text-[10px] text-stone-400 font-medium">Your local Sri Lanka guide</span>
+          </div>
+          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 ml-1">
             Prototype
           </span>
         </div>
@@ -225,37 +234,34 @@ export default function MockAssistantPanel({
           strokeWidth={2}
           aria-hidden="true"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M19 9l-7 7-7-7"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
       {/* ── Expanded body ── */}
       {open && (
         <div className="border-t border-stone-100 px-4 py-4 flex flex-col gap-4">
-          {/* Intro message (shown before any prompt selected) */}
+          {/* Intro message */}
           {!activePromptId && (
-            <p className="text-sm text-stone-600 leading-relaxed">
-              I can help adjust this prototype itinerary using the places already
-              available in Travel Amigo.
+            <p className="text-sm text-stone-600 leading-relaxed bg-stone-50 rounded-xl px-4 py-3 border border-stone-100">
+              I can help adjust this itinerary using the places available in
+              Travel Amigo. Pick a question below to get started.
             </p>
           )}
 
           {/* Prompt buttons grid */}
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-2 gap-2">
             {ASSISTANT_PROMPTS.map((prompt) => (
               <button
                 key={prompt.id}
                 type="button"
                 onClick={() => handlePrompt(prompt.id)}
                 className={cn(
-                  "rounded-xl border px-3 py-2 text-left text-xs font-medium leading-snug transition-colors",
+                  "rounded-xl border px-3 py-2.5 text-left text-xs font-medium leading-snug transition-all duration-150",
+                  "hover:shadow-sm",
                   activePromptId === prompt.id
-                    ? "border-teal-400 bg-teal-50 text-teal-800"
-                    : "border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100 hover:border-stone-300"
+                    ? "border-teal-400 bg-teal-50 text-teal-800 shadow-sm"
+                    : "border-stone-200 bg-white text-stone-700 hover:border-teal-200 hover:bg-teal-50/40 hover:text-teal-800"
                 )}
               >
                 {prompt.label}
@@ -268,17 +274,19 @@ export default function MockAssistantPanel({
             <div className="flex flex-col gap-3">
               {/* User message bubble */}
               <div className="flex justify-end">
-                <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-teal-700 px-3.5 py-2.5 text-sm text-white font-medium leading-snug">
+                <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-teal-700 px-4 py-2.5 text-sm text-white font-medium leading-snug shadow-sm shadow-teal-900/20">
                   {activeLabel}
                 </div>
               </div>
 
               {/* Assistant response bubble */}
-              <div className="flex gap-2 items-start">
-                <div className="mt-0.5 shrink-0 w-6 h-6 rounded-full bg-stone-100 border border-stone-200 flex items-center justify-center text-[10px] font-bold text-stone-500 select-none">
-                  A
+              <div className="flex gap-2.5 items-start">
+                <div className="mt-0.5 shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-teal-600 to-emerald-700 border border-teal-500/20 flex items-center justify-center shadow-sm">
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-white" aria-hidden>
+                    <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                  </svg>
                 </div>
-                <div className="flex-1 min-w-0 rounded-2xl rounded-tl-sm bg-stone-50 border border-stone-200 px-3.5 py-3">
+                <div className="flex-1 min-w-0 rounded-2xl rounded-tl-sm bg-stone-50 border border-stone-200 px-4 py-3.5">
                   <ResponseView
                     response={response}
                     actionApplied={actionApplied}
