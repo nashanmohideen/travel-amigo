@@ -5,7 +5,7 @@
  * All sharing still uses localStorage via ShareModal and SharedItineraryView.
  *
  * When backend is ready:
- *   1. Implement backend endpoints at POST /api/share, GET /api/share/:token
+ *   1. Implement backend endpoints at POST /api/share/create-link, GET /api/share/:token/view
  *   2. Wire useCreateShareLinkMutation into ShareModal
  *   3. Wire useGetSharedItineraryQuery into SharedItineraryView
  *   4. Replace localStorage-based links with real UUID-based URLs
@@ -20,16 +20,15 @@ export const shareApi = baseApi.injectEndpoints({
     /**
      * Create a shareable link for an itinerary.
      *
-     * Future implementation:
-     *   POST /api/share
-     *   body: CreateShareLinkRequest { itinerary: GeneratedItinerary }
-     *   response: ShareLinkResponse { ok: boolean; token: string; url: string; expiresAt?: string }
+     * POST /api/v1/share/create-link
+     * body: CreateShareLinkRequest { itinerary: GeneratedItinerary }
+     * response: ShareLinkResponse { ok: boolean; token: string; url: string; expiresAt?: string }
      *
      * Currently not used (localStorage + mock URL in ShareModal).
      */
     createShareLink: builder.mutation<ShareLinkResponse, CreateShareLinkRequest>({
       query: (payload) => ({
-        url: "/share",
+        url: "/share/create-link",
         method: "POST",
         body: payload,
       }),
@@ -39,23 +38,21 @@ export const shareApi = baseApi.injectEndpoints({
     /**
      * Fetch a shared itinerary by token.
      *
-     * Future implementation:
-     *   GET /api/share/:token
-     *   response: GeneratedItinerary (public, no auth required)
+     * GET /api/v1/share/:token/view
+     * response: GeneratedItinerary (public, no auth required)
      *
      * Currently not used (localStorage in SharedItineraryView).
      */
     getSharedItinerary: builder.query<GeneratedItinerary, string>({
-      query: (token) => `/share/${token}`,
+      query: (token) => `/share/${token}/view`,
       providesTags: (result) => (result ? ["Share"] : []),
     }),
 
     /**
      * Delete a share link (optional, for future privacy controls).
      *
-     * Future implementation:
-     *   DELETE /api/share/:token
-     *   response: ApiDeleteResponse { ok: boolean; message?: string }
+     * DELETE /api/v1/share/:token
+     * response: ApiDeleteResponse { ok: boolean; message?: string }
      *
      * Currently not used.
      */

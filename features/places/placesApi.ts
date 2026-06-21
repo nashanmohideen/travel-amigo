@@ -17,7 +17,7 @@ import type { Destination, Place, PlaceInterest, TravelStyle } from "@/types";
 
 /**
  * Lightweight destination string list returned by
- * GET /api/v1/places/destinations.
+ * GET /api/v1/places/available-destinations.
  * Each entry is the exact lowercase DB value (e.g. "ella", "nuwara-eliya").
  */
 export type DestinationName = string;
@@ -37,11 +37,11 @@ export const placesApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     /**
      * Live destination list from the DB.
-     * GET /api/v1/places/destinations → string[]
+     * GET /api/v1/places/available-destinations → string[]
      * Each string is the exact lowercase value stored in Place.destination.
      */
     getDestinationNames: builder.query<DestinationName[], void>({
-      query: () => "/places/destinations",
+      query: () => "/places/available-destinations",
       providesTags: ["Destination"],
     }),
 
@@ -66,12 +66,12 @@ export const placesApi = baseApi.injectEndpoints({
     /**
      * Search places with optional filters (PlacesModule).
      *
-     * GET /api/v1/places?destination=ella&interests=nature,photography&travelStyle=budget&category=nature
+     * GET /api/v1/places/search?destination=ella&interests=nature,photography&travelStyle=budget&category=nature
      * response: Place[]
      */
     searchPlaces: builder.query<Place[], PlaceSearchParams>({
       query: (params) => ({
-        url: "/places",
+        url: "/places/search",
         params: {
           destination: params.destination,
           category: params.category,
@@ -85,12 +85,12 @@ export const placesApi = baseApi.injectEndpoints({
     /**
      * Fetch places for a specific destination (PlacesModule).
      *
-     * GET /api/v1/places?destination=:id
+     * GET /api/v1/places/search?destination=:id
      * response: Place[]
      */
     getDestinationPlaces: builder.query<Place[], string>({
       query: (destinationId) => ({
-        url: "/places",
+        url: "/places/search",
         params: { destination: destinationId },
       }),
       providesTags: ["Place"],
@@ -99,11 +99,11 @@ export const placesApi = baseApi.injectEndpoints({
     /**
      * Fetch a single place by ID (PlacesModule).
      *
-     * GET /api/v1/places/:id
+     * GET /api/v1/places/:id/details
      * response: Place (+ rating/openingHours enriched via cached Google data)
      */
     getPlace: builder.query<Place, string>({
-      query: (id) => `/places/${id}`,
+      query: (id) => `/places/${id}/details`,
       providesTags: (result) => (result ? ["Place"] : []),
     }),
   }),
