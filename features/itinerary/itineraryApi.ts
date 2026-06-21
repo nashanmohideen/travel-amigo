@@ -20,13 +20,13 @@ export const itineraryApi = baseApi.injectEndpoints({
     /**
      * Generate a new itinerary from trip input.
      *
-     * POST /api/v1/trips/generate
+     * POST /api/v1/trips/generate-itinerary
      * body: TripInput → response: GeneratedItinerary
      * Guests allowed; rate-limited server-side (10/hour per IP).
      */
     generateItinerary: builder.mutation<GeneratedItinerary, TripInput>({
       query: (tripInput) => ({
-        url: "/trips/generate",
+        url: "/trips/generate-itinerary",
         method: "POST",
         body: toGenerateDTO(tripInput),
       }),
@@ -36,12 +36,12 @@ export const itineraryApi = baseApi.injectEndpoints({
     /**
      * Save/persist an edited itinerary as a Trip (requires auth).
      *
-     * POST /api/v1/trips
+     * POST /api/v1/trips/save-itinerary
      * body: { title, budget, itinerarySnapshot } → response: Trip record
      */
     saveItinerary: builder.mutation<SaveItineraryResponse, GeneratedItinerary>({
       query: (itinerary) => ({
-        url: "/trips",
+        url: "/trips/save-itinerary",
         method: "POST",
         body: {
           title: itinerary.title,
@@ -59,21 +59,21 @@ export const itineraryApi = baseApi.injectEndpoints({
     /**
      * List the user's saved trips (requires auth).
      *
-     * GET /api/v1/trips → Trip records.
+     * GET /api/v1/trips/my-trips → Trip records.
      */
     listTrips: builder.query<TripRecord[], void>({
-      query: () => "/trips",
+      query: () => "/trips/my-trips",
       providesTags: ["Trip"],
     }),
 
     /**
      * Fetch a saved trip's itinerary by trip ID (requires auth).
      *
-     * GET /api/v1/trips/:id → Trip record; the snapshot is the exact
+     * GET /api/v1/trips/:id/details → Trip record; the snapshot is the exact
      * GeneratedItinerary as last rendered.
      */
     getItinerary: builder.query<GeneratedItinerary, string>({
-      query: (id) => `/trips/${id}`,
+      query: (id) => `/trips/${id}/details`,
       transformResponse: (trip: TripRecord): GeneratedItinerary => trip.itinerarySnapshot,
       providesTags: (result) => (result ? ["Itinerary"] : []),
     }),
