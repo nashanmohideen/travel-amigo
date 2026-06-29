@@ -1,19 +1,62 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { FormEvent, Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Card from "@/components/ui/Card";
-import { useVerifyEmailMutation } from "@/features/auth/authApi";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import { useVerifyEmailMutation, useResendVerificationMutation } from "@/features/auth/authApi";
 
 type VerifyState = "verifying" | "success" | "error" | "no-token";
+
+function ResendForm({ defaultEmail = "" }: { defaultEmail?: string }) {
+  const [resend, { isLoading }] = useResendVerificationMutation();
+  const [email, setEmail] = useState(defaultEmail);
+  const [message, setMessage] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+
+  async function handleResend(e: FormEvent) {
+    e.preventDefault();
+    setMessage(null);
+    try {
+      await resend({ email }).unwrap();
+      setSent(true);
+      setMessage("Verification email sent — check your inbox.");
+    } catch {
+      setMessage("Something went wrong. Please try again.");
+    }
+  }
+
+  if (sent) {
+    return (
+      <p className="mt-4 text-sm text-teal-700 font-medium">{message}</p>
+    );
+  }
+
+  return (
+    <form onSubmit={handleResend} className="mt-4 flex flex-col gap-3">
+      <Input
+        label="Email address"
+        id="resend-email"
+        type="email"
+        required
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+      <Button type="submit" loading={isLoading} fullWidth>
+        Resend verification email
+      </Button>
+      {message && <p className="text-sm text-red-600">{message}</p>}
+    </form>
+  );
+}
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
   const [verifyEmail] = useVerifyEmailMutation();
   const [state, setState] = useState<VerifyState>(token ? "verifying" : "no-token");
-  // Run the verification exactly once (StrictMode re-invokes effects in dev)
   const startedRef = useRef(false);
 
   useEffect(() => {
@@ -58,12 +101,15 @@ function VerifyEmailContent() {
               <h1 className="text-xl font-bold text-stone-900 mb-1">
                 This link has expired or is invalid.
               </h1>
-              <p className="text-sm text-stone-500 mb-6">
-                Sign in to request a new verification email.
+              <p className="text-sm text-stone-500 mb-4">
+                Enter your email to receive a new verification link.
               </p>
+              <div className="text-left">
+                <ResendForm />
+              </div>
               <Link
                 href="/login"
-                className="font-semibold text-teal-700 hover:text-teal-800 transition-colors text-sm"
+                className="mt-4 inline-block font-semibold text-teal-700 hover:text-teal-800 transition-colors text-sm"
               >
                 Back to login →
               </Link>
@@ -72,16 +118,19 @@ function VerifyEmailContent() {
 
           {state === "no-token" && (
             <>
-              <div className="text-4xl mb-3">🔍</div>
+              <div className="text-4xl mb-3">📬</div>
               <h1 className="text-xl font-bold text-stone-900 mb-1">
-                No verification token found.
+                Verify your email
               </h1>
-              <p className="text-sm text-stone-500 mb-6">
-                Use the link from your verification email.
+              <p className="text-sm text-stone-500 mb-4">
+                Use the link in your verification email, or request a new one below.
               </p>
+              <div className="text-left">
+                <ResendForm />
+              </div>
               <Link
                 href="/login"
-                className="font-semibold text-teal-700 hover:text-teal-800 transition-colors text-sm"
+                className="mt-4 inline-block font-semibold text-teal-700 hover:text-teal-800 transition-colors text-sm"
               >
                 Back to login →
               </Link>

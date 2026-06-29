@@ -8,8 +8,12 @@
  * admin role checks are client-side only.
  *
  * Public paths (/, /login, /register, /verify-email, /share/*, /shared/*,
- * /itinerary/*, /feedback, …) are never redirected: the matcher below simply
- * doesn't include them.
+ * /feedback, …) are never redirected: the matcher below simply doesn't
+ * include them.
+ *
+ * Itinerary generation (/plan, /itinerary/demo) requires a session — guests
+ * are redirected to /login with a redirect param so they land back here after
+ * signing in.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -29,7 +33,15 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Protected: /trips/*, /profile/* (auth) and /admin/* (auth here; the
-  // admin role itself is enforced client-side by AdminRoute)
-  matcher: ["/trips/:path*", "/trips", "/profile/:path*", "/profile", "/admin/:path*"],
+  // Protected: itinerary generation (/plan, /itinerary/demo), saved trips
+  // (/trips/*), profile, and admin (role checked client-side by AdminRoute).
+  matcher: [
+    "/plan",
+    "/itinerary/demo",
+    "/trips/:path*",
+    "/trips",
+    "/profile/:path*",
+    "/profile",
+    "/admin/:path*",
+  ],
 };

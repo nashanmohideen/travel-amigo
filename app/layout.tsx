@@ -23,7 +23,7 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: "Travel Amigo — Sri Lanka Travel Planner",
   description:
-    "Plan your Sri Lanka trip with a day-by-day itinerary, estimated costs, routes, and local travel tips — no sign-up needed.",
+    "Plan your Sri Lanka trip with a day-by-day itinerary, estimated costs, routes, and local travel tips.",
   openGraph: {
     title: "Travel Amigo — Sri Lanka Travel Planner",
     description: "Plan your Sri Lanka adventure in minutes. Estimated costs, day-by-day routes, and local tips included.",
