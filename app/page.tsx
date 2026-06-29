@@ -1,29 +1,19 @@
 import Link from "next/link";
+import Image from "next/image";
 import Button from "@/components/ui/Button";
 import { destinations } from "@/data/destinations";
 
-// ── Destination gradient map ────────────────────────────────────────────────
-const destinationStyle: Record<string, { gradient: string; textColor: string }> = {
-  ella: {
-    gradient: "from-emerald-500 via-green-600 to-teal-700",
-    textColor: "text-emerald-50",
-  },
-  kandy: {
-    gradient: "from-violet-500 via-purple-700 to-indigo-800",
-    textColor: "text-violet-50",
-  },
-  galle: {
-    gradient: "from-amber-400 via-orange-500 to-rose-600",
-    textColor: "text-amber-50",
-  },
-  "nuwara-eliya": {
-    gradient: "from-sky-400 via-cyan-500 to-teal-700",
-    textColor: "text-sky-50",
-  },
-  colombo: {
-    gradient: "from-slate-600 via-stone-700 to-zinc-900",
-    textColor: "text-slate-100",
-  },
+// ── Destination image map ─────────────────────────────────────────────────────
+const destinationImage: Record<string, string> = {
+  ella: "/images/destinations/ella.png",
+  kandy:
+    "https://images.unsplash.com/photo-1665849050332-8d5d7e59afb6?fm=jpg&q=80&w=1200&auto=format&fit=crop",
+  galle:
+    "https://images.unsplash.com/photo-1704797390682-76479a29dc9a?fm=jpg&q=80&w=1200&auto=format&fit=crop",
+  "nuwara-eliya":
+    "https://images.unsplash.com/photo-1585171328560-947fbd92d6f0?fm=jpg&q=80&w=1200&auto=format&fit=crop",
+  colombo:
+    "https://images.unsplash.com/photo-1718210142145-91d159d05815?fm=jpg&q=80&w=1200&auto=format&fit=crop",
 };
 
 const FEATURED_DESTINATION_IDS = ["ella", "kandy", "galle", "nuwara-eliya", "colombo"];
@@ -137,9 +127,9 @@ export default function LandingPage() {
         <div className="relative mx-auto max-w-5xl px-4 py-24 sm:py-36 lg:py-44">
           <div className="flex flex-col items-center text-center gap-7 max-w-3xl mx-auto">
             {/* Eyebrow */}
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-4 py-1.5 text-sm font-medium backdrop-blur-sm">
-              🇱🇰 <span className="text-white/80">Free to use · No sign-up needed</span>
-            </span>
+            {/* <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-4 py-1.5 text-sm font-medium backdrop-blur-sm">
+              🇱🇰 <span className="text-white/80">Free to use</span>
+            </span> */}
 
             {/* Headline — serif font for warmth and travel feel */}
             <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.05] tracking-tight">
@@ -315,34 +305,34 @@ export default function LandingPage() {
           {/* Destination cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {featuredDestinations.map((dest, i) => {
-              const style = destinationStyle[dest.id] ?? {
-                gradient: "from-teal-500 to-emerald-700",
-                textColor: "text-white",
-              };
+              const imgSrc = destinationImage[dest.id] ?? null;
               const isFeature = i === 0;
               return (
                 <div
                   key={dest.id}
                   className={`group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 ${isFeature ? "lg:col-span-2" : ""}`}
                 >
-                  {/* Gradient background */}
-                  <div
-                    className={`absolute inset-0 bg-gradient-to-br ${style.gradient} transition-transform duration-500 group-hover:scale-[1.04]`}
-                  />
-                  {/* Noise texture overlay */}
-                  <div
-                    aria-hidden
-                    className="absolute inset-0 opacity-[0.08]"
-                    style={{
-                      backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`,
-                    }}
-                  />
+                  {/* Photo background */}
+                  {imgSrc ? (
+                    <div className="absolute inset-0 transition-transform duration-500 group-hover:scale-[1.04]">
+                      <Image
+                        src={imgSrc}
+                        alt={dest.name}
+                        fill
+                        sizes={isFeature ? "(max-width: 1024px) 100vw, 66vw" : "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"}
+                        className="object-cover"
+                        priority={i === 0}
+                      />
+                    </div>
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-teal-500 to-emerald-700" />
+                  )}
                   {/* Vignette */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
 
                   {/* Content */}
                   <div
-                    className={`relative flex flex-col justify-end p-6 ${isFeature ? "min-h-72 sm:min-h-80" : "min-h-56"} ${style.textColor}`}
+                    className={`relative flex flex-col justify-end p-6 ${isFeature ? "min-h-72 sm:min-h-80" : "min-h-56"} text-white`}
                   >
                     {/* Top: emoji */}
                     <div className="absolute top-5 left-5 text-4xl drop-shadow-lg">
