@@ -8,6 +8,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { logout } from "@/features/auth/authSlice";
 import { useLogoutMutation } from "@/features/auth/authApi";
 import { clearAuthTokens } from "@/lib/api-client";
+import Image from "next/image";
 
 const navLinks = [
   { href: "/", label: "Home" },
@@ -26,7 +27,7 @@ export default function Header() {
   const dispatch = useAppDispatch();
 
   const { user, status } = useAppSelector((s) => s.auth);
-  const [logoutRequest, { isLoading: isSigningOut }] = useLogoutMutation();
+  const [logoutRequest, { isLoading: isSigningOut }] = useLogoutMutation()
 
   async function handleSignOut() {
     try {
@@ -44,7 +45,7 @@ export default function Header() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 group">
-          <span className="text-2xl transition-transform duration-300 group-hover:rotate-12">✈️</span>
+          <Image src="/airplane.svg" alt="logo" width={27} height={27} className="transition-transform duration-300 group-hover:rotate-12" />
           <span className="text-lg font-bold tracking-tight text-stone-900 group-hover:text-teal-700 transition-colors duration-150">
             Travel<span className="text-teal-700">Amigo</span>
           </span>
