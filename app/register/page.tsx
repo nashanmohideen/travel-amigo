@@ -12,7 +12,7 @@ import {
   registerSuccess,
   registerFailure,
 } from "@/features/auth/authSlice";
-import { useRegisterMutation } from "@/features/auth/authApi";
+import { useRegisterMutation, useResendVerificationMutation } from "@/features/auth/authApi";
 import {
   isApiQueryError,
   mapValidationErrors,
@@ -55,6 +55,7 @@ function PasswordStrength({ password }: { password: string }) {
 export default function RegisterPage() {
   const dispatch = useAppDispatch();
   const [register, { isLoading }] = useRegisterMutation();
+  const [resendVerification, { isLoading: isResending }] = useResendVerificationMutation();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -62,6 +63,8 @@ export default function RegisterPage() {
   const [fieldErrors, setFieldErrors] = useState<RegisterFieldErrors>({});
   const [bannerError, setBannerError] = useState<string | null>(null);
   const [registered, setRegistered] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -102,6 +105,20 @@ export default function RegisterPage() {
     }
   }
 
+  async function handleResend() {
+    if (resendCooldown) return;
+    setResendMessage(null);
+    setResendCooldown(true);
+    setTimeout(() => setResendCooldown(false), 30000);
+    try {
+      await resendVerification({ email }).unwrap();
+      setResendMessage("Sent! Check your inbox.");
+    } catch {
+      setResendMessage("Something went wrong. Please try again.");
+      setResendCooldown(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-stone-50 flex items-start justify-center px-4 py-16">
       <div className="w-full max-w-md">
@@ -119,12 +136,23 @@ export default function RegisterPage() {
               <p className="text-base font-semibold text-stone-800 mb-1">
                 Check your email to verify your account.
               </p>
-              <p className="text-sm text-stone-500 mb-6">
+              <p className="text-sm text-stone-500 mb-4">
                 We sent a verification link to <strong>{email}</strong>.
               </p>
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={isResending || resendCooldown}
+                className="text-sm font-semibold text-teal-700 hover:text-teal-800 transition-colors disabled:opacity-50 mb-4"
+              >
+                {isResending ? "Sending…" : resendCooldown ? "Email sent" : "Resend verification email"}
+              </button>
+              {resendMessage && (
+                <p className="text-xs text-stone-500 mb-4">{resendMessage}</p>
+              )}
               <Link
                 href="/login"
-                className="font-semibold text-teal-700 hover:text-teal-800 transition-colors text-sm"
+                className="block font-semibold text-teal-700 hover:text-teal-800 transition-colors text-sm"
               >
                 Back to login →
               </Link>

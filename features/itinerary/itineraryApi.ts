@@ -22,7 +22,7 @@ export const itineraryApi = baseApi.injectEndpoints({
      *
      * POST /api/v1/trips/generate-itinerary
      * body: TripInput → response: GeneratedItinerary
-     * Guests allowed; rate-limited server-side (10/hour per IP).
+     * Requires auth (JWT); rate-limited server-side (10/hour per IP).
      */
     generateItinerary: builder.mutation<GeneratedItinerary, TripInput>({
       query: (tripInput) => ({

@@ -8,7 +8,7 @@ import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import { useAppDispatch } from "@/store/hooks";
 import { loginStart, loginSuccess, loginFailure } from "@/features/auth/authSlice";
-import { useLoginMutation, useVerifyEmailMutation } from "@/features/auth/authApi";
+import { useLoginMutation, useResendVerificationMutation } from "@/features/auth/authApi";
 import {
   isApiQueryError,
   mapValidationErrors,
@@ -29,7 +29,7 @@ function LoginForm() {
   const dispatch = useAppDispatch();
 
   const [login, { isLoading }] = useLoginMutation();
-  const [resendVerification, { isLoading: isResending }] = useVerifyEmailMutation();
+  const [resendVerification, { isLoading: isResending }] = useResendVerificationMutation();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -77,14 +77,10 @@ function LoginForm() {
   async function handleResend() {
     setResendMessage(null);
     try {
-      // Backend contract gap: /auth/verify-email expects { token } and has no
-      // email-based resend yet — this degrades gracefully until one exists.
-      await resendVerification({ token: "" }).unwrap();
+      await resendVerification({ email }).unwrap();
       setResendMessage("Verification email sent — check your inbox.");
     } catch {
-      setResendMessage(
-        "Resend isn't available yet — please use the link in your original verification email."
-      );
+      setResendMessage("Something went wrong. Please try again.");
     }
   }
 

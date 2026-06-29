@@ -16,13 +16,15 @@ import { useAppSelector } from "@/store/hooks";
 export default function ProtectedRoute({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const status = useAppSelector((s) => s.auth.status);
+  const { status, user } = useAppSelector((s) => s.auth);
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+    } else if (status === "authenticated" && user && !user.emailVerified) {
+      router.replace("/verify-email");
     }
-  }, [status, pathname, router]);
+  }, [status, user, pathname, router]);
 
   if (status !== "authenticated") {
     return (
@@ -30,6 +32,17 @@ export default function ProtectedRoute({ children }: { children: ReactNode }) {
         <div className="text-center">
           <div className="text-4xl mb-3">✈️</div>
           <p className="text-stone-500">Loading…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (user && !user.emailVerified) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-3">✉️</div>
+          <p className="text-stone-500">Redirecting to email verification…</p>
         </div>
       </div>
     );

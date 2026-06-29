@@ -6,8 +6,9 @@
  *
  * Contract notes (verified against the backend):
  *   - login/register/refresh all return { accessToken, refreshToken, user }
+ *   - login returns 403 with code EMAIL_NOT_VERIFIED for unverified accounts
  *   - logout is POST (not DELETE) and requires a Bearer token
- *   - verify-email accepts { token } only — there is no resend endpoint yet
+ *   - resend-verification accepts { email } and always returns 200
  */
 
 import { baseApi } from "@/features/api/baseApi";
@@ -56,6 +57,15 @@ export const authApi = baseApi.injectEndpoints({
       invalidatesTags: ["User"],
     }),
 
+    /** POST /api/v1/auth/resend-verification { email } — always returns 200. */
+    resendVerification: builder.mutation<ApiSuccessResponse, { email: string }>({
+      query: (body) => ({
+        url: "/auth/resend-verification",
+        method: "POST",
+        body,
+      }),
+    }),
+
     /** POST /api/v1/auth/logout — revokes the stored refresh token server-side. */
     logout: builder.mutation<ApiSuccessResponse, void>({
       query: () => ({
@@ -70,5 +80,6 @@ export const {
   useLoginMutation,
   useRegisterMutation,
   useVerifyEmailMutation,
+  useResendVerificationMutation,
   useLogoutMutation,
 } = authApi;

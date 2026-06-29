@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import SelectOption from "@/components/ui/SelectOption";
 import { cn, formatLKR } from "@/lib/utils";
 import type { TripInput, TravelStyle, TransportMode, TripPace } from "@/types";
 import { LS_TRIP_INPUT, LS_EDITED_ITINERARY } from "@/lib/storageKeys";
-import { useAppDispatch } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { setTripDraft } from "@/features/trips/tripDraftSlice";
 import { useGenerateItineraryMutation } from "@/features/itinerary/itineraryApi";
 import { setActiveItinerary } from "@/features/itinerary/itinerarySlice";
@@ -68,6 +69,65 @@ const DEFAULT_FORM: TripInput = {
 };
 
 type FormErrors = Partial<Record<keyof TripInput, string>>;
+
+// ── Auth gate overlay ─────────────────────────────────────────────────────────
+function AuthGate({ redirectPath }: { redirectPath: string }) {
+  const encoded = encodeURIComponent(redirectPath);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl shadow-stone-900/25 overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-br from-teal-900 via-teal-800 to-emerald-800 px-8 py-8 text-center">
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-white/15 text-3xl backdrop-blur-sm">
+            🗺️
+          </div>
+          <h2 className="text-xl font-bold text-white leading-tight">
+            Sign in to generate your itinerary
+          </h2>
+          <p className="mt-2 text-sm text-white/70 leading-relaxed">
+            Create a free account to unlock your personalised Sri Lanka travel plan.
+          </p>
+        </div>
+
+        {/* Benefits */}
+        <div className="px-8 py-6 border-b border-stone-100">
+          <ul className="flex flex-col gap-3">
+            {[
+              { icon: "✨", text: "AI-generated day-by-day itineraries" },
+              { icon: "💾", text: "Save and revisit your trips anytime" },
+              { icon: "✏️", text: "Edit, swap places, and customise your plan" },
+              { icon: "🔗", text: "Share your itinerary with travel companions" },
+            ].map(({ icon, text }) => (
+              <li key={text} className="flex items-center gap-3 text-sm text-stone-700">
+                <span className="text-base shrink-0">{icon}</span>
+                {text}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Actions */}
+        <div className="px-8 py-6 flex flex-col gap-3">
+          <Link
+            href={`/register?redirect=${encoded}`}
+            className="flex w-full items-center justify-center rounded-xl bg-amber-400 px-6 py-3 text-sm font-bold text-stone-900 shadow-sm shadow-amber-900/20 hover:bg-amber-300 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2"
+          >
+            Create free account
+          </Link>
+          <Link
+            href={`/login?redirect=${encoded}`}
+            className="flex w-full items-center justify-center rounded-xl border-2 border-stone-200 bg-white px-6 py-3 text-sm font-semibold text-stone-700 hover:border-teal-300 hover:text-teal-700 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+          >
+            Sign in to existing account
+          </Link>
+          <p className="text-center text-xs text-stone-400">
+            Free forever &middot; No credit card required
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Section heading ───────────────────────────────────────────────────────────
 function SectionLabel({ step, children }: { step: number; children: string }) {
@@ -160,11 +220,14 @@ function SummaryPanel({
 // ── Main form ─────────────────────────────────────────────────────────────────
 export default function TripForm() {
   const router = useRouter();
+  const pathname = usePathname();
   const dispatch = useAppDispatch();
+  const authStatus = useAppSelector((s) => s.auth.status);
   const [form, setForm] = useState<TripInput>(DEFAULT_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showAuthGate, setShowAuthGate] = useState(false);
 
   const [generateItinerary] = useGenerateItineraryMutation();
 
@@ -215,6 +278,11 @@ export default function TripForm() {
       return;
     }
 
+    if (authStatus !== "authenticated") {
+      setShowAuthGate(true);
+      return;
+    }
+
     setLoading(true);
 
     try { localStorage.setItem(LS_TRIP_INPUT, JSON.stringify(form)); } catch {}
@@ -233,6 +301,8 @@ export default function TripForm() {
   }
 
   return (
+    <>
+    {showAuthGate && <AuthGate redirectPath={pathname} />}
     <form onSubmit={handleSubmit} noValidate>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
@@ -486,5 +556,6 @@ export default function TripForm() {
 
       </div>
     </form>
+    </>
   );
 }
